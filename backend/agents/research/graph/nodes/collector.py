@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from typing import Any
 
 from backend.agents.research.graph.state import ResearchState
@@ -15,6 +16,25 @@ SOURCE_TYPE_MAP = {
     "scholar": SourceType.SCHOLAR,
     "news": SourceType.NEWS,
 }
+
+# No single search may hang the whole run. SerpAPI/LLM clients have no
+# reliable built-in timeout, so each query is bounded here. Worst case for a
+# round is now ~len(queries) x SEARCH_TIMEOUT_S instead of forever.
+SEARCH_TIMEOUT_S = 60
+PROGRESS_EVERY_N = 3
+
+
+def _bounded_search(query_text: str, source_type: SourceType) -> list:
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        fut = pool.submit(search, query_text, source_type, 10)
+        try:
+            return fut.result(timeout=SEARCH_TIMEOUT_S)
+        except FuturesTimeout:
+            logger.warning(f"Search timed out after {SEARCH_TIMEOUT_S}s: {query_text[:80]}")
+            return []
+        except Exception as e:
+            logger.warning(f"Search failed: {e}")
+            return []
 
 
 def collector_node(state: ResearchState) -> dict[str, Any]:
@@ -46,7 +66,10 @@ def collector_node(state: ResearchState) -> dict[str, Any]:
         source_type = SOURCE_TYPE_MAP.get(source_type_str, SourceType.GOOGLE)
         logger.info(f"Searching [{source_type_str}]: {query_text}")
 
-        results = search(query_text, source_type, num_results=10)
+        if len(searches_done) % PROGRESS_EVERY_N == 0:
+            report_progress("searching", f"Searching ({len(searches_done) + 1}/{len(queries)} queries)")
+
+        results = _bounded_search(query_text, source_type)
 
         for r in results:
             all_results.append(r.to_dict())

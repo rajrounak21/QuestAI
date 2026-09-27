@@ -60,6 +60,20 @@ function runSeconds(doc) {
   return Math.max(0, Math.floor((Date.now() - t) / 1000));
 }
 
+function fmtElapsed(total) {
+  const s = Math.max(0, Math.floor(total || 0));
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ${String(s % 60).padStart(2, "0")}s`;
+  const h = Math.floor(m / 60);
+  return `${h}h ${String(m % 60).padStart(2, "0")}m`;
+}
+
+function isFresh(doc) {
+  const t = new Date(doc?.progress?.at || doc?.updated_at || 0).getTime();
+  return !Number.isNaN(t) && Date.now() - t < 90000;
+}
+
 // new-chat icon (ChatGPT-style square-pen) — exact reference SVG
 function NewChatSvg() {
   return (
@@ -140,26 +154,36 @@ export default function Research() {
       1000
     );
     let tries = 0;
+    let errs = 0;
     pollRef.current = setInterval(async () => {
       tries += 1;
       try {
         const d = await researchApi.getSession(id);
+        errs = 0;
         startedRef.current = d.started_at || startedRef.current;
         setElapsed(runSeconds(d));
         setDoc(d);
-        if (d.status !== "running" || tries >= POLL_MAX) {
+        if (d.status !== "running") {
           stopPoll();
           setRunning(false);
           loadSessions();
-          if (tries >= POLL_MAX && d.status === "running") {
-            setNotice("Still working — refresh in a bit. The run continues on the server.");
-          }
+        } else if (isFresh(d)) {
+          tries = 0; // server is alive and working — keep watching, no 120s cutoff
+        } else if (tries >= POLL_MAX) {
+          stopPoll();
+          setRunning(false);
+          loadSessions();
+          setNotice("Still working — refresh in a bit. The run continues on the server.");
         }
       } catch (e) {
         if (e.code === "unauthorized") {
           stopPoll();
           setRunning(false);
           navigate("/login", { replace: true });
+        } else if (++errs >= 10) {
+          stopPoll();
+          setRunning(false);
+          setNotice("Lost connection to the server. Restart the backend and refresh.");
         }
       }
     }, POLL_MS);
@@ -350,7 +374,7 @@ export default function Research() {
                 </span>
               ))}
               <span className="rs-pipe-time">
-                {detail || "Starting…"} · {elapsed}s
+                {detail || "Starting…"} · {fmtElapsed(elapsed)}
               </span>
               <button className="rs-cancel" onClick={cancelRun}>
                 ✕ Cancel
