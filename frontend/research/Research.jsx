@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { researchApi, timeAgo } from "./api";
 import { getToken } from "../auth/api";
-import { LogoMark, ThemeToggle } from "../auth/components/ui";
 import { SendIcon } from "../auth/components/icons";
 import "./Research.css";
 
@@ -204,24 +203,12 @@ export default function Research() {
 
   return (
     <div className="rs">
-      {/* thin persistent rail — never opens/closes */}
-      <aside className="rs-rail" aria-label="Primary">
-        <Link to="/home" className="rs-rail-logo" title="QuestAI home">
-          <LogoMark size={26} />
-        </Link>
-        <button className="rs-rail-btn rs-rail-new" title="New research" onClick={newChat}>
-          +
-        </button>
-        <div className="rs-rail-spacer" />
-        <ThemeToggle />
-        <Link to="/home" className="rs-rail-btn" title="Back to workspace">
-          ⌂
-        </Link>
-      </aside>
-
       {/* report workspace */}
       <main className="rs-main">
         <header className="rs-top">
+          <Link to="/home" className="rs-back" title="Back to workspace">
+            ←
+          </Link>
           <div className="rs-title">
             <h1>{doc?.query || "Research"}</h1>
             {doc && (
@@ -234,9 +221,14 @@ export default function Research() {
               </span>
             )}
           </div>
-          <button className="rs-sess-btn" onClick={() => setPanelOpen(true)}>
-            Sessions
-          </button>
+          <div className="rs-top-actions">
+            <button className="rs-new-btn" onClick={newChat}>
+              + New
+            </button>
+            <button className="rs-sess-btn" onClick={() => setPanelOpen(true)}>
+              Sessions
+            </button>
+          </div>
         </header>
 
         {notice && <p className="rs-notice">{notice}</p>}
@@ -408,7 +400,6 @@ export default function Research() {
       {/* sessions — right on desktop, slide-over on mobile */}
       <aside className={`rs-sessions${panelOpen ? " open" : ""}`} aria-label="Sessions">
         <div className="rs-sess-head">
-          <strong>Sessions</strong>
           <button className="auth-link" onClick={newChat}>
             + New
           </button>
