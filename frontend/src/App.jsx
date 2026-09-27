@@ -7,6 +7,7 @@ import ForgotPassword from "../auth/ForgotPassword";
 import Home from "../auth/Home";
 import Login from "../auth/Login";
 import Signup from "../auth/Signup";
+import Research from "../research/Research";
 import { applyTheme, getTheme } from "../auth/theme";
 
 // Root: "/" = landing page, auth + app routes below.
@@ -23,6 +24,8 @@ export default function App() {
         <Route path="/signup" element={<Signup />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/home" element={<Home />} />
+        <Route path="/research" element={<Research />} />
+        <Route path="/research/:sessionId" element={<Research />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

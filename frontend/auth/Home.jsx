@@ -14,11 +14,20 @@ const SUGGESTIONS = [
   { agent: "Jobs", text: "Find AI internships in India" },
 ];
 
-const ACTIVITY = [
-  { agent: "Research", title: "RAG evaluation frameworks", when: "2 hours ago" },
-  { agent: "Travel", title: "Delhi → Dubai flights", when: "Yesterday" },
-  { agent: "Jobs", title: "AI Engineer internships", when: "Yesterday" },
-];
+function timeAgo(iso) {
+  if (!iso) return "";
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return "";
+  const s = Math.max(1, Math.floor((Date.now() - t) / 1000));
+  if (s < 60) return "just now";
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}d ago`;
+  return new Date(iso).toLocaleDateString();
+}
 
 const AGENT_ROWS = [
   { name: "Research", desc: "Deep research, evidence and structured answers" },
@@ -51,6 +60,7 @@ export default function Home() {
   const [agent, setAgent] = useState("Auto");
   const [query, setQuery] = useState("");
   const [routing, setRouting] = useState(null); // { steps:[], done, label }
+  const [activity, setActivity] = useState([]);
 
   useEffect(() => {
     if (!getToken()) {
@@ -81,6 +91,13 @@ export default function Home() {
         const data = await res.json();
         setUser(data.user);
         setLoading(false);
+        authFetch("/api/research/history?limit=5")
+          .then(async (h) => {
+            if (!h || h.unauthorized || h.networkError) return;
+            const hd = await h.json().catch(() => ({}));
+            setActivity(hd.items || []);
+          })
+          .catch(() => {});
       })
       .catch(() => {
         setLoading(false);
@@ -103,6 +120,10 @@ export default function Home() {
     e.preventDefault();
     const q = query.trim();
     if (!q || routing) return;
+    if (agent === "Research") {
+      navigate(`/research?q=${encodeURIComponent(q)}`);
+      return;
+    }
     const label = agent === "Auto" ? "Auto" : agent;
     const steps =
       agent === "Auto"
@@ -205,7 +226,13 @@ export default function Home() {
             <div className="dash-pills-row">
               {AGENTS.map((a) => (
                 <button key={a} className={`dash-pill${agent === a ? " active" : ""}`}
-                  onClick={() => setAgent(a)}>
+                  onClick={() => {
+                    if (a === "Research") {
+                      navigate("/research");
+                      return;
+                    }
+                    setAgent(a);
+                  }}>
                   {a === "Auto" ? (<><SparkleIcon /> Auto</>) : a}
                 </button>
               ))}
@@ -216,7 +243,13 @@ export default function Home() {
             <div className="dash-suggest-grid">
               {SUGGESTIONS.map((s) => (
                 <button key={s.text} className="dash-suggest-card"
-                  onClick={() => { setQuery(s.text); setAgent(s.agent); }}>
+                  onClick={() => {
+                    if (s.agent === "Research") {
+                      navigate(`/research?q=${encodeURIComponent(s.text)}`);
+                      return;
+                    }
+                    setQuery(s.text); setAgent(s.agent);
+                  }}>
                   <strong>{s.agent}</strong>
                   <span>&ldquo;{s.text}&rdquo;</span>
                 </button>
@@ -245,13 +278,23 @@ export default function Home() {
         <section>
           <p className="dash-sect-label">Recent activity</p>
           <div className="dash-activity">
-            {ACTIVITY.map((a) => (
-              <div className="dash-act-card" key={a.title}>
-                <strong>{a.agent}</strong>
-                <span className="dash-act-title">{a.title}</span>
+            {activity.length === 0 && (
+              <div className="dash-act-card">
+                <strong>Research</strong>
+                <span className="dash-act-title">Your workspace is ready — start by asking something.</span>
                 <div className="dash-act-foot">
-                  <span>{a.when}</span>
-                  <button className="auth-link">Open →</button>
+                  <span>no history yet</span>
+                  <button className="auth-link" onClick={() => navigate("/research")}>Ask something →</button>
+                </div>
+              </div>
+            )}
+            {activity.map((a) => (
+              <div className="dash-act-card" key={a.session_id}>
+                <strong>Research</strong>
+                <span className="dash-act-title">{a.query}</span>
+                <div className="dash-act-foot">
+                  <span>{a.status === "running" ? "researching…" : timeAgo(a.updated_at)}</span>
+                  <button className="auth-link" onClick={() => navigate(`/research/${a.session_id}`)}>Open →</button>
                 </div>
               </div>
             ))}
@@ -268,7 +311,11 @@ export default function Home() {
                   <strong>{a.name}</strong>
                   <span>{a.desc}</span>
                 </div>
-                <button className="auth-link">Explore →</button>
+                {a.name === "Research" ? (
+                  <button className="auth-link" onClick={() => navigate("/research")}>Explore →</button>
+                ) : (
+                  <button className="auth-link">Explore →</button>
+                )}
               </div>
             ))}
           </div>
