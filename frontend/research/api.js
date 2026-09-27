@@ -24,9 +24,9 @@ async function unwrap(res) {
 }
 
 export const researchApi = {
-  run: ({ query, session_id, force_new, force_continue, max_rounds }) =>
+  run: async ({ query, session_id, force_new, force_continue, max_rounds }) =>
     unwrap(
-      authFetch("/api/research/run", {
+      await authFetch("/api/research/run", {
         method: "POST",
         body: JSON.stringify({
           query,
@@ -37,8 +37,8 @@ export const researchApi = {
         }),
       })
     ),
-  history: (limit = 30) => unwrap(authFetch(`/api/research/history?limit=${limit}`)),
-  getSession: (session_id) => unwrap(authFetch(`/api/research/${session_id}`)),
+  history: async (limit = 30) => unwrap(await authFetch(`/api/research/history?limit=${limit}`)),
+  getSession: async (session_id) => unwrap(await authFetch(`/api/research/${session_id}`)),
 };
 
 export function timeAgo(iso) {
