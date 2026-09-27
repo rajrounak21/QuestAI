@@ -243,6 +243,9 @@ export default function Research() {
               </span>
             )}
           </div>
+          <button className="rs-head-new" onClick={newChat} title="New chat" aria-label="New chat">
+            <NewChatSvg />
+          </button>
           <button className="rs-top-btn" onClick={newChat} aria-label="New chat">
             <NewChatSvg />
           </button>
@@ -431,11 +434,11 @@ export default function Research() {
       {/* sessions — slide-over panel from right, all screens */}
       <aside className={`rs-sessions${panelOpen ? " open" : ""}`} aria-label="Sessions">
         <div className="rs-sess-head">
+          <button className="auth-link" onClick={newChat}>
+            + New
+          </button>
           <button className="auth-link" onClick={() => setPanelOpen(false)} aria-label="Close sessions">
             ✕
-          </button>
-          <button className="rs-rail-btn" title="New chat" onClick={newChat} aria-label="New chat">
-            <NewChatSvg />
           </button>
         </div>
         <div className="rs-sess-list">

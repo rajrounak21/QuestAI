@@ -43,6 +43,17 @@
   position: relative;
 }
 .rs-top h1 { font-family: var(--display); font-size: clamp(20px, 2.4vw, 28px); letter-spacing: -0.02em; margin: 0 0 4px; }
+.rs-head-new {
+  flex-shrink: 0;
+  width: 38px; height: 38px;
+  display: grid; place-items: center;
+  border: 1px solid transparent;
+  background: transparent; color: var(--muted);
+  border-radius: 12px; cursor: pointer;
+  margin-top: 2px;
+}
+.rs-head-new:hover { color: var(--text); background: var(--soft); }
+.rs-head-new svg { display: block; }
 .rs-top-btn {
   display: none;
   flex-shrink: 0;
@@ -215,6 +226,7 @@
   .rs-rail { display: none; }
   .rs-top { align-items: center; }
   .rs-top-btn { display: grid; }
+  .rs-head-new { display: none; }
   .rs-top-btn:hover { color: var(--text); background: var(--soft); }
   .rs-main { padding: 16px 16px 130px; }
   .rs-ask {
