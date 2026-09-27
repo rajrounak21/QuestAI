@@ -31,7 +31,6 @@
 .rs-rail-btn:hover { color: var(--text); background: var(--soft); }
 .rs-rail-btn.active { color: var(--accent); border-color: rgba(91,124,255,.4); background: rgba(91,124,255,.1); }
 .rs-rail-btn svg { display: block; }
-a.rs-rail-btn { text-decoration: none; }
 .rs-rail-new { color: var(--text); background: var(--soft); border-color: var(--line); }
 
 /* ---- main document ---- */
@@ -59,7 +58,6 @@ a.rs-rail-btn { text-decoration: none; }
   margin-top: 2px;
 }
 .rs-top-btn svg { display: block; }
-a.rs-top-btn { text-decoration: none; }
 .rs-sess-btn { display: none; }
 .rs-meta { color: var(--muted); font-size: 13px; display: flex; align-items: center; gap: 6px; }
 .rs-quality { color: var(--accent); font-weight: 600; }
