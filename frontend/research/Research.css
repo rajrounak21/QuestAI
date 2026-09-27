@@ -43,7 +43,17 @@
   padding: 28px 28px 140px;
   position: relative;
 }
+.rs-top {
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+}
 .rs-top h1 { font-family: var(--display); font-size: clamp(20px, 2.4vw, 28px); letter-spacing: -0.02em; margin: 0 0 4px; }
+.rs-sess-btn {
+  display: none;
+  flex-shrink: 0;
+  border: 1px solid var(--line); background: var(--soft); color: var(--text);
+  border-radius: 999px; padding: 8px 16px; cursor: pointer; font-size: 13.5px;
+  margin-top: 4px;
+}
 .rs-meta { color: var(--muted); font-size: 13px; display: flex; align-items: center; gap: 6px; }
 .rs-quality { color: var(--accent); font-weight: 600; }
 .rs-meta-time { color: var(--faint); }
@@ -116,13 +126,13 @@
 .rs-sources a { color: var(--text); }
 .rs-sources span { color: var(--faint); font-size: 12.5px; }
 
-/* command bar */
+/* command bar — centered inside the report column, not the whole viewport */
 .rs-ask {
   position: fixed;
   bottom: 18px;
-  left: 50%;
+  left: calc(60px + (100vw - 340px) / 2);
   transform: translateX(-50%);
-  width: min(720px, calc(100vw - 32px));
+  width: min(800px, calc(100vw - 340px - 56px));
   display: flex; gap: 8px; align-items: center;
   background: var(--input-bg);
   border: 1px solid var(--input-line);
@@ -205,4 +215,9 @@
     background: rgba(0, 0, 0, 0.45); border: 0; padding: 0; cursor: pointer;
   }
   .rs-main { padding: 20px 16px 130px; }
+  .rs-sess-btn { display: block; }
+  .rs-ask {
+    left: 50%;
+    width: min(720px, calc(100vw - 32px));
+  }
 }

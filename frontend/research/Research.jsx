@@ -212,13 +212,6 @@ export default function Research() {
         <button className="rs-rail-btn rs-rail-new" title="New research" onClick={newChat}>
           +
         </button>
-        <button
-          className={`rs-rail-btn${panelOpen ? " active" : ""}`}
-          title="Sessions"
-          onClick={() => setPanelOpen((p) => !p)}
-        >
-          ▤
-        </button>
         <div className="rs-rail-spacer" />
         <ThemeToggle />
         <Link to="/home" className="rs-rail-btn" title="Back to workspace">
@@ -241,6 +234,9 @@ export default function Research() {
               </span>
             )}
           </div>
+          <button className="rs-sess-btn" onClick={() => setPanelOpen(true)}>
+            Sessions
+          </button>
         </header>
 
         {notice && <p className="rs-notice">{notice}</p>}
