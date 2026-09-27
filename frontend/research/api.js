@@ -39,6 +39,8 @@ export const researchApi = {
     ),
   history: async (limit = 30) => unwrap(await authFetch(`/api/research/history?limit=${limit}`)),
   getSession: async (session_id) => unwrap(await authFetch(`/api/research/${session_id}`)),
+  cancel: async (session_id) =>
+    unwrap(await authFetch(`/api/research/${session_id}/cancel`, { method: "POST" })),
 };
 
 export function timeAgo(iso) {

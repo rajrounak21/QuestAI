@@ -88,6 +88,12 @@ a.rs-rail-btn { text-decoration: none; }
   border: 1px solid var(--faint);
 }
 .rs-pipe-time { margin-left: auto; color: var(--faint); }
+.rs-cancel {
+  background: none; border: 1px solid var(--line); color: var(--muted);
+  border-radius: 999px; padding: 4px 12px; cursor: pointer; font-size: 12.5px;
+  flex-shrink: 0;
+}
+.rs-cancel:hover { color: var(--text); border-color: var(--accent); }
 .rs-pulse {
   width: 8px; height: 8px; border-radius: 50%;
   background: var(--accent);

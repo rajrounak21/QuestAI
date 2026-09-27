@@ -8,6 +8,10 @@ MAX_RELOAD_EVIDENCE = 50
 MAX_RELOAD_SEARCHES = 30
 MAX_RELOAD_CONVERSATION = 10
 
+# A run that reports nothing for this long is dead (server restart/kill).
+# Reads auto-heal it to failed instead of showing "running" forever.
+STALE_RUN_MINUTES = 10
+
 # Dashboard card needs only these fields.
 HISTORY_PROJECTION = {
     "query": 1,
@@ -43,6 +47,7 @@ def new_research_doc(
         "evidence": [],
         "searches": [],
         "conversation": [],
+        "started_at": now,
         "created_at": now,
         "updated_at": now,
     }
@@ -128,6 +133,56 @@ def set_progress(user_id: str, session_id: str, stage: str, detail: str = "") ->
     get_research_collection().update_one(
         {"user_id": user_id, "session_id": session_id},
         {"$set": {"progress": {"stage": stage, "detail": detail, "at": now}, "updated_at": now}},
+    )
+
+
+def is_stale(doc: dict[str, Any] | None) -> bool:
+    """True when a run died without finishing (worker gone, no heartbeat)."""
+    if not doc or doc.get("status") != "running":
+        return False
+    updated = doc.get("updated_at")
+    if not updated:
+        return True
+    try:
+        if updated.tzinfo is None:
+            updated = updated.replace(tzinfo=timezone.utc)
+        age_min = (_utcnow() - updated).total_seconds() / 60
+    except Exception:
+        return True
+    return age_min > STALE_RUN_MINUTES
+
+
+def heal_stale(user_id: str, session_id: str) -> bool:
+    """Flip a dead run to failed so the UI unlocks. Returns True if healed."""
+    from backend.database.collections import get_research_collection
+
+    doc = get_research_collection().find_one(
+        {"user_id": user_id, "session_id": session_id}, {"status": 1, "updated_at": 1}
+    )
+    if not is_stale(doc):
+        return False
+    now = _utcnow()
+    get_research_collection().update_one(
+        {"user_id": user_id, "session_id": session_id, "status": "running"},
+        {
+            "$set": {
+                "status": "failed",
+                "error": "Run stopped unexpectedly (server restarted or worker lost). Ask again to retry.",
+                "progress": {"stage": "failed", "detail": "Run stopped", "at": now},
+                "updated_at": now,
+            }
+        },
+    )
+    return True
+
+
+def mark_running(user_id: str, session_id: str) -> None:
+    from backend.database.collections import get_research_collection
+
+    now = _utcnow()
+    get_research_collection().update_one(
+        {"user_id": user_id, "session_id": session_id},
+        {"$set": {"status": "running", "started_at": now, "updated_at": now}},
     )
 
 

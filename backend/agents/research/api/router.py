@@ -13,8 +13,11 @@ from backend.database.collections import get_research_collection
 from backend.database.research_sessions import (
     complete_session,
     doc_to_session_data,
+    heal_stale,
     insert_new_session,
+    is_stale,
     list_history,
+    mark_running,
 )
 from backend.agents.research.memory.session import build_context_for_question
 from backend.agents.research.services.progress import clear_target, report, set_target
@@ -62,6 +65,10 @@ def _run_and_persist(
         # Scratch uuid: keeps server's in-memory SessionMemory out of the
         # persistence path (Mongo doc is the source of truth, no double context).
         result = run_research(effective_query, session_id=str(uuid.uuid4()), max_rounds=max_rounds)
+        cur = col.find_one({"user_id": user_id, "session_id": session_id}, {"status": 1})
+        if cur and cur.get("status") == "cancelled":
+            logger.info(f"Research run cancelled by user session={session_id}, dropping result")
+            return
         complete_session(
             user_id=user_id,
             session_id=session_id,
@@ -91,8 +98,11 @@ async def run(body: RunIn, tasks: BackgroundTasks, user: dict = Depends(get_curr
     session_id = body.session_id or str(uuid.uuid4())
     doc = col.find_one({"user_id": user_id, "session_id": session_id})
 
-    if doc and doc.get("status") == "running" and not (body.force_new or body.force_continue):
-        raise HTTPException(status_code=409, detail={"message": "research already running", "session_id": session_id})
+    if doc and doc.get("status") == "running":
+        if is_stale(doc) or heal_stale(user_id, session_id):
+            doc = col.find_one({"user_id": user_id, "session_id": session_id})
+        elif not (body.force_new or body.force_continue):
+            raise HTTPException(status_code=409, detail={"message": "research already running", "session_id": session_id})
 
     session = doc_to_session_data(doc, session_id)
     route = route_session(session, body.query, force_new=body.force_new, force_continue=body.force_continue)
@@ -113,10 +123,7 @@ async def run(body: RunIn, tasks: BackgroundTasks, user: dict = Depends(get_curr
         effective = body.query
     else:
         effective = build_context_for_question(session, body.query)
-        col.update_one(
-            {"user_id": user_id, "session_id": session_id},
-            {"$set": {"status": "running"}},
-        )
+        mark_running(user_id, session_id)
     tasks.add_task(asyncio.to_thread, _run_and_persist, user_id, session_id, body.query, effective, body.max_rounds)
     return RunAccepted(session_id=session_id)
 
@@ -129,9 +136,20 @@ async def history(limit: int = 5, user: dict = Depends(get_current_user)):
     return {"items": items}
 
 
+@router.post("/{session_id}/cancel")
+async def cancel_session(session_id: str, user: dict = Depends(get_current_user)):
+    col = get_research_collection()
+    res = col.update_one(
+        {"user_id": user["id"], "session_id": session_id, "status": "running"},
+        {"$set": {"status": "cancelled"}},
+    )
+    return {"cancelled": res.modified_count > 0, "session_id": session_id}
+
+
 @router.get("/{session_id}")
 async def get_session(session_id: str, user: dict = Depends(get_current_user)) -> dict[str, Any]:
     col = get_research_collection()
+    heal_stale(user["id"], session_id)
     doc = col.find_one({"user_id": user["id"], "session_id": session_id})
     if not doc:
         raise HTTPException(status_code=404, detail="session not found")

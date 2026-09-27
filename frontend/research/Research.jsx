@@ -29,11 +29,35 @@ function buildRefNumbers(report, evidence) {
     if (s.url && !urlToIdx.has(s.url)) urlToIdx.set(s.url, i + 1);
   });
   const evById = new Map((evidence || []).map((e) => [e.id, e]));
-  return (ref) => {
+  const num = (ref) => {
     const ev = evById.get(ref);
     const url = ev?.source?.url;
     return (url && urlToIdx.get(url)) || ref.replace("ev_", "");
   };
+  return { num, has: (ref) => evById.has(ref) };
+}
+
+// rich text: (ev_012)/ev_012 -> clickable [n] evidence refs
+function renderRich(text, refs, onRef) {
+  if (!text) return null;
+  const parts = String(text).split(/(\(ev_\d+\)|\bev_\d+\b)/g);
+  return parts.map((p, i) => {
+    const m = p.match(/^\(?(ev_\d+)\)?$/);
+    if (m && refs.has(m[1])) {
+      return (
+        <button key={i} className="rs-ref" title="View evidence" onClick={() => onRef(m[1])}>
+          [{refs.num(m[1])}]
+        </button>
+      );
+    }
+    return <span key={i}>{p}</span>;
+  });
+}
+
+function runSeconds(doc) {
+  const t = doc?.started_at ? new Date(doc.started_at).getTime() : NaN;
+  if (Number.isNaN(t)) return 0;
+  return Math.max(0, Math.floor((Date.now() - t) / 1000));
 }
 
 // new-chat icon (ChatGPT-style square-pen) — exact reference SVG
@@ -88,6 +112,7 @@ export default function Research() {
   const pollRef = useRef(null);
   const autoRunRef = useRef(false);
   const elapsedRef = useRef(null);
+  const startedRef = useRef(null);
 
   const loadSessions = async () => {
     try {
@@ -108,13 +133,19 @@ export default function Research() {
   const pollUntilDone = (id) => {
     stopPoll();
     setRunning(true);
+    startedRef.current = null;
     setElapsed(0);
-    elapsedRef.current = setInterval(() => setElapsed((e) => e + 1), 1000);
+    elapsedRef.current = setInterval(
+      () => setElapsed(runSeconds({ started_at: startedRef.current })),
+      1000
+    );
     let tries = 0;
     pollRef.current = setInterval(async () => {
       tries += 1;
       try {
         const d = await researchApi.getSession(id);
+        startedRef.current = d.started_at || startedRef.current;
+        setElapsed(runSeconds(d));
         setDoc(d);
         if (d.status !== "running" || tries >= POLL_MAX) {
           stopPoll();
@@ -223,6 +254,7 @@ export default function Research() {
 
   const newChat = () => {
     stopPoll();
+    startedRef.current = null;
     setRunning(false);
     setDoc(null);
     setInput("");
@@ -233,8 +265,23 @@ export default function Research() {
     navigate("/research");
   };
 
+  const cancelRun = async () => {
+    if (!sessionId) return;
+    try {
+      await researchApi.cancel(sessionId);
+    } catch {
+      /* server already forgot it — just stop polling */
+    }
+    stopPoll();
+    setRunning(false);
+    const d = await researchApi.getSession(sessionId).catch(() => null);
+    if (d) setDoc(d);
+    loadSessions();
+  };
+
   const report = doc?.report || null;
-  const refNum = buildRefNumbers(report, doc?.evidence);
+  const refs = buildRefNumbers(report, doc?.evidence);
+  const openRef = (ref) => setInspector((doc.evidence || []).find((e) => e.id === ref) || null);
   const quality = report?.validation_notes?.overall_quality;
 
   const toggleFinding = (i) => setOpenFindings((m) => ({ ...m, [i]: m[i] === false }));
@@ -288,6 +335,9 @@ export default function Research() {
               <span className="rs-pipe-time">
                 {detail || "Starting…"} · {elapsed}s
               </span>
+              <button className="rs-cancel" onClick={cancelRun}>
+                ✕ Cancel
+              </button>
             </section>
           );
         })()}
@@ -325,7 +375,7 @@ export default function Research() {
               {report?.executive_summary && (
                 <section>
                   <p className="rs-sect">Executive summary</p>
-                  <p className="rs-summary">{report.executive_summary}</p>
+                  <p className="rs-summary">{renderRich(report.executive_summary, refs, openRef)}</p>
                 </section>
               )}
 
@@ -345,19 +395,19 @@ export default function Research() {
                         {open && (
                           <div className="rs-finding-body">
                             <p>
-                              {f.explanation}{" "}
-                              {(f.evidence_refs || []).map((r) => (
-                                <button
-                                  key={r}
-                                  className="rs-ref"
-                                  title="View evidence"
-                                  onClick={() =>
-                                    setInspector((doc.evidence || []).find((e) => e.id === r) || null)
-                                  }
-                                >
-                                  [{refNum(r)}]
-                                </button>
-                              ))}
+                              {renderRich(f.explanation, refs, openRef)}{" "}
+                              {(f.evidence_refs || [])
+                                .filter((r) => !(f.explanation || "").includes(r) && refs.has(r))
+                                .map((r) => (
+                                  <button
+                                    key={r}
+                                    className="rs-ref"
+                                    title="View evidence"
+                                    onClick={() => openRef(r)}
+                                  >
+                                    [{refs.num(r)}]
+                                  </button>
+                                ))}
                             </p>
                             {(f.sources || []).map(
                               (s) =>
@@ -384,19 +434,19 @@ export default function Research() {
               {report?.comparison && (
                 <section>
                   <p className="rs-sect">Comparison</p>
-                  <p>{report.comparison}</p>
+                  <p>{renderRich(report.comparison, refs, openRef)}</p>
                 </section>
               )}
               {report?.recent_developments && (
                 <section>
                   <p className="rs-sect">Recent developments</p>
-                  <p>{report.recent_developments}</p>
+                  <p>{renderRich(report.recent_developments, refs, openRef)}</p>
                 </section>
               )}
               {report?.limitations && (
                 <section>
                   <p className="rs-sect">Limitations</p>
-                  <p>{report.limitations}</p>
+                  <p>{renderRich(report.limitations, refs, openRef)}</p>
                 </section>
               )}
 
@@ -420,6 +470,9 @@ export default function Research() {
                 <p className="rs-notice">
                   This run failed{doc.error ? `: ${doc.error}` : "."} Ask again to retry.
                 </p>
+              )}
+              {doc.status === "cancelled" && (
+                <p className="rs-notice">Run cancelled. Ask again whenever ready.</p>
               )}
             </article>
           )
