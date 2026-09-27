@@ -242,9 +242,6 @@ export default function Research() {
           <button className="rs-top-btn" onClick={() => setPanelOpen(true)} aria-label="Open sessions">
             <PanelSvg />
           </button>
-          <Link to="/home" className="rs-top-btn" aria-label="Home">
-            <HomeSvg />
-          </Link>
           <div className="rs-title">
             <h1>{doc?.query || "Research"}</h1>
             {doc && (
@@ -452,9 +449,14 @@ export default function Research() {
           <button className="auth-link" onClick={() => setPanelOpen(false)} aria-label="Close sessions">
             ✕
           </button>
-          <button className="rs-rail-btn" title="New chat" onClick={newChat} aria-label="New chat">
-            <NewChatSvg />
-          </button>
+          <span className="rs-sess-actions">
+            <Link to="/home" className="rs-rail-btn" title="Home" aria-label="Home">
+              <HomeSvg />
+            </Link>
+            <button className="rs-rail-btn" title="New chat" onClick={newChat} aria-label="New chat">
+              <NewChatSvg />
+            </button>
+          </span>
         </div>
         <div className="rs-sess-list">
           {sessions.length === 0 && <p className="rs-sess-empty">No sessions yet.</p>}
