@@ -191,13 +191,26 @@ a.rs-rail-btn { text-decoration: none; color: var(--muted); }
 .rs-sess-list { overflow-y: auto; padding: 0 10px 16px; display: flex; flex-direction: column; gap: 4px; }
 .rs-sess-empty { color: var(--faint); font-size: 13px; padding: 8px; }
 .rs-sess {
-  display: grid; grid-template-columns: auto 1fr; gap: 2px 8px;
-  align-items: center; text-align: left; cursor: pointer;
-  background: transparent; border: 1px solid transparent; color: var(--text);
-  border-radius: 12px; padding: 9px 10px;
+  display: grid; grid-template-columns: 1fr auto;
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 12px; padding: 4px;
 }
 .rs-sess:hover { background: var(--soft); }
 .rs-sess.active { background: rgba(91,124,255,.1); border-color: rgba(91,124,255,.35); }
+.rs-sess-open {
+  display: grid; grid-template-columns: auto 1fr; gap: 2px 8px;
+  align-items: center; text-align: left; cursor: pointer;
+  background: transparent; border: 0; color: var(--text);
+  border-radius: 8px; padding: 5px 6px; min-width: 0;
+}
+.rs-sess-del {
+  width: 26px; height: 26px; border-radius: 8px; border: 0; cursor: pointer;
+  background: transparent; color: var(--faint); font-size: 13px; line-height: 1;
+  opacity: 0;
+}
+.rs-sess:hover .rs-sess-del, .rs-sess.active .rs-sess-del { opacity: 1; }
+.rs-sess-del:hover { color: #ea4335; background: rgba(234,67,53,.12); }
 .rs-sess-q {
   font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   grid-column: 2;
@@ -211,6 +224,10 @@ a.rs-rail-btn { text-decoration: none; color: var(--muted); }
 .rs-scrim {
   display: block; position: fixed; inset: 0; z-index: 20;
   background: rgba(0, 0, 0, 0.45); border: 0; padding: 0; cursor: pointer;
+}
+
+@media (hover: none) {
+  .rs-sess-del { opacity: 1; }
 }
 
 /* ---- overlays: evidence inspector + confirm ---- */

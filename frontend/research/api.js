@@ -41,6 +41,8 @@ export const researchApi = {
   getSession: async (session_id) => unwrap(await authFetch(`/api/research/${session_id}`)),
   cancel: async (session_id) =>
     unwrap(await authFetch(`/api/research/${session_id}/cancel`, { method: "POST" })),
+  remove: async (session_id) =>
+    unwrap(await authFetch(`/api/research/${session_id}`, { method: "DELETE" })),
 };
 
 export function timeAgo(iso) {

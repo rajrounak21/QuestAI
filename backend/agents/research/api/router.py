@@ -146,6 +146,13 @@ async def cancel_session(session_id: str, user: dict = Depends(get_current_user)
     return {"cancelled": res.modified_count > 0, "session_id": session_id}
 
 
+@router.delete("/{session_id}")
+async def delete_session(session_id: str, user: dict = Depends(get_current_user)):
+    col = get_research_collection()
+    res = col.delete_one({"user_id": user["id"], "session_id": session_id})
+    return {"deleted": res.deleted_count > 0, "session_id": session_id}
+
+
 @router.get("/{session_id}")
 async def get_session(session_id: str, user: dict = Depends(get_current_user)) -> dict[str, Any]:
     col = get_research_collection()

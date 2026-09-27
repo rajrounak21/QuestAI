@@ -265,6 +265,23 @@ export default function Research() {
     navigate("/research");
   };
 
+  const deleteSession = async (id) => {
+    try {
+      await researchApi.remove(id);
+    } catch {
+      setNotice("Could not delete this session.");
+      return;
+    }
+    if (id === sessionId) {
+      stopPoll();
+      startedRef.current = null;
+      setRunning(false);
+      setDoc(null);
+      navigate("/research");
+    }
+    loadSessions();
+  };
+
   const cancelRun = async () => {
     if (!sessionId) return;
     try {
@@ -533,18 +550,27 @@ export default function Research() {
         <div className="rs-sess-list">
           {sessions.length === 0 && <p className="rs-sess-empty">No sessions yet.</p>}
           {sessions.map((s) => (
-            <button
-              key={s.session_id}
-              className={`rs-sess${s.session_id === sessionId ? " active" : ""}`}
-              onClick={() => {
-                setPanelOpen(false);
-                navigate(`/research/${s.session_id}`);
-              }}
-            >
-              {statusDot(s.status)}
-              <span className="rs-sess-q">{s.query}</span>
-              <span className="rs-sess-t">{timeAgo(s.updated_at)}</span>
-            </button>
+            <div key={s.session_id} className={`rs-sess${s.session_id === sessionId ? " active" : ""}`}>
+              <button
+                className="rs-sess-open"
+                onClick={() => {
+                  setPanelOpen(false);
+                  navigate(`/research/${s.session_id}`);
+                }}
+              >
+                {statusDot(s.status)}
+                <span className="rs-sess-q">{s.query}</span>
+                <span className="rs-sess-t">{timeAgo(s.updated_at)}</span>
+              </button>
+              <button
+                className="rs-sess-del"
+                title="Delete session"
+                aria-label="Delete session"
+                onClick={() => deleteSession(s.session_id)}
+              >
+                ✕
+              </button>
+            </div>
           ))}
         </div>
       </aside>
