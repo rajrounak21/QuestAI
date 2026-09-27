@@ -242,6 +242,9 @@ export default function Research() {
           <button className="rs-top-btn" onClick={() => setPanelOpen(true)} aria-label="Open sessions">
             <PanelSvg />
           </button>
+          <Link to="/home" className="rs-top-btn" aria-label="Home">
+            <HomeSvg />
+          </Link>
           <div className="rs-title">
             <h1>{doc?.query || "Research"}</h1>
             {doc && (

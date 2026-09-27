@@ -60,6 +60,7 @@ a.rs-rail-btn { text-decoration: none; }
   margin-top: 2px;
 }
 .rs-top-btn svg { display: block; }
+a.rs-top-btn { text-decoration: none; color: var(--muted); }
 .rs-sess-btn { display: none; }
 .rs-meta { color: var(--muted); font-size: 13px; display: flex; align-items: center; gap: 6px; }
 .rs-quality { color: var(--accent); font-weight: 600; }
