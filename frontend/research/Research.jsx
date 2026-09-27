@@ -206,9 +206,6 @@ export default function Research() {
       {/* report workspace */}
       <main className="rs-main">
         <header className="rs-top">
-          <Link to="/home" className="rs-back" title="Back to workspace">
-            ←
-          </Link>
           <div className="rs-title">
             <h1>{doc?.query || "Research"}</h1>
             {doc && (
@@ -220,14 +217,6 @@ export default function Research() {
                 <span className="rs-meta-time"> · {timeAgo(doc.updated_at)}</span>
               </span>
             )}
-          </div>
-          <div className="rs-top-actions">
-            <button className="rs-new-btn" onClick={newChat}>
-              + New
-            </button>
-            <button className="rs-sess-btn" onClick={() => setPanelOpen(true)}>
-              Sessions
-            </button>
           </div>
         </header>
 
@@ -397,7 +386,21 @@ export default function Research() {
         </form>
       </main>
 
-      {/* sessions — right on desktop, slide-over on mobile */}
+      {/* thin icon rail — right side, always visible */}
+      <aside className="rs-rail" aria-label="Primary">
+        <button className="rs-rail-btn rs-rail-new" title="New research" onClick={newChat}>
+          +
+        </button>
+        <button
+          className={`rs-rail-btn${panelOpen ? " active" : ""}`}
+          title="Sessions"
+          onClick={() => setPanelOpen((p) => !p)}
+        >
+          ▤
+        </button>
+      </aside>
+
+      {/* sessions — slide-over panel from right, all screens */}
       <aside className={`rs-sessions${panelOpen ? " open" : ""}`} aria-label="Sessions">
         <div className="rs-sess-head">
           <button className="auth-link" onClick={newChat}>
