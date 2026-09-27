@@ -10,6 +10,7 @@ const POLL_MAX = 40;
 const PIPE_STEPS = ["Planning", "Searching", "Synthesizing", "Validating"];
 
 function statusDot(status) {
+
   if (status === "running") return <span className="rs-dot rs-dot-run" />;
   if (status === "failed") return <span className="rs-dot rs-dot-fail" />;
   return <span className="rs-dot rs-dot-done" />;
@@ -28,6 +29,26 @@ function buildRefNumbers(report, evidence) {
     const url = ev?.source?.url;
     return (url && urlToIdx.get(url)) || ref.replace("ev_", "");
   };
+}
+
+// clean stroke icons — no text glyphs in the rail
+function PlusSvg() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth={2.2} strokeLinecap="round" aria-hidden="true">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+function PanelSvg() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth={2} strokeLinecap="round" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M15 4v16" />
+    </svg>
+  );
 }
 
 export default function Research() {
@@ -389,14 +410,14 @@ export default function Research() {
       {/* thin icon rail — right side, always visible */}
       <aside className="rs-rail" aria-label="Primary">
         <button className="rs-rail-btn rs-rail-new" title="New research" onClick={newChat}>
-          +
+          <PlusSvg />
         </button>
         <button
           className={`rs-rail-btn${panelOpen ? " active" : ""}`}
           title="Sessions"
           onClick={() => setPanelOpen((p) => !p)}
         >
-          ▤
+          <PanelSvg />
         </button>
       </aside>
 
@@ -405,6 +426,9 @@ export default function Research() {
         <div className="rs-sess-head">
           <button className="auth-link" onClick={newChat}>
             + New
+          </button>
+          <button className="auth-link" onClick={() => setPanelOpen(false)} aria-label="Close sessions">
+            ✕
           </button>
         </div>
         <div className="rs-sess-list">

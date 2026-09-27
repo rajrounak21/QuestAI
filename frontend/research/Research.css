@@ -30,7 +30,8 @@
 }
 .rs-rail-btn:hover { color: var(--text); background: var(--soft); }
 .rs-rail-btn.active { color: var(--accent); border-color: rgba(91,124,255,.4); background: rgba(91,124,255,.1); }
-.rs-rail-new { font-size: 22px; color: var(--text); background: var(--soft); border-color: var(--line); }
+.rs-rail-btn svg { display: block; }
+.rs-rail-new { color: var(--text); background: var(--soft); border-color: var(--line); }
 
 /* ---- main document ---- */
 .rs-main {
@@ -130,10 +131,11 @@
   box-shadow: var(--card-shadow);
 }
 .rs-ask input {
-  flex: 1; background: none; border: 0; outline: 0; color: var(--text);
+  flex: 1; min-width: 0; background: none; border: 0; outline: 0; color: var(--text);
 }
 .rs-ask input:disabled { color: var(--faint); }
 .rs-ask button {
+  flex-shrink: 0;
   width: 40px; height: 40px; border-radius: 50%; border: 0; cursor: pointer;
   background: var(--grad); color: #fff; display: grid; place-items: center;
 }
@@ -142,7 +144,7 @@
 /* ---- sessions: slide-over from right on all screens ---- */
 .rs-sessions {
   position: fixed; top: 0; right: 0; bottom: 0; z-index: 30;
-  width: min(320px, 86vw);
+  width: min(300px, 84vw);
   border-left: 1px solid var(--line);
   background: var(--bg1);
   display: flex; flex-direction: column;
@@ -199,4 +201,8 @@
 /* ---- responsive ---- */
 @media (max-width: 1100px) {
   .rs-main { padding: 20px 16px 130px; }
+  .rs-ask {
+    left: calc((100vw - 60px) / 2);
+    width: calc(100vw - 60px - 24px);
+  }
 }
