@@ -1,0 +1,1040 @@
+{
+  "search_metadata": {
+    "id": "6ab20d19c29c3d033b66fdfe",
+    "status": "Success",
+    "json_endpoint": "https://serpapi.com/searches/5Bx3wUYIILoy8X_EmBMGGSFFUuNRyhY_sbzCxBSHnF4/6ab20d19c29c3d033b66fdfe.json",
+    "markdown_endpoint": "https://serpapi.com/searches/5Bx3wUYIILoy8X_EmBMGGSFFUuNRyhY_sbzCxBSHnF4/6ab20d19c29c3d033b66fdfe.md",
+    "created_at": "2026-09-22 05:07:37 UTC",
+    "processed_at": "2026-09-22 05:07:37 UTC",
+    "google_flights_url": "https://www.google.com/travel/flights?hl=en&gl=us&curr=USD&tfs=CBwQAhoeEgoyMDI2LTEwLTE1agcIARIDREVMcgcIARIDRFhCQAFIAXABmAEC&tfu=EgIIAQ",
+    "raw_html_file": "https://serpapi.com/searches/5Bx3wUYIILoy8X_EmBMGGSFFUuNRyhY_sbzCxBSHnF4/6ab20d19c29c3d033b66fdfe.html",
+    "prettify_html_file": "https://serpapi.com/searches/5Bx3wUYIILoy8X_EmBMGGSFFUuNRyhY_sbzCxBSHnF4/6ab20d19c29c3d033b66fdfe.prettify",
+    "total_time_taken": 1.63
+  },
+  "search_parameters": {
+    "engine": "google_flights",
+    "hl": "en",
+    "gl": "us",
+    "type": "2",
+    "departure_id": "DEL",
+    "arrival_id": "DXB",
+    "outbound_date": "2026-10-15",
+    "travel_class": 1,
+    "currency": "USD"
+  },
+  "best_flights": [
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "Indira Gandhi International Airport",
+            "id": "DEL",
+            "time": "2026-10-15 01:25"
+          },
+          "arrival_airport": {
+            "name": "Dubai International Airport",
+            "id": "DXB",
+            "time": "2026-10-15 04:00"
+          },
+          "duration": 245,
+          "airplane": "Airbus A320neo",
+          "airline": "Air India",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/AI.png",
+          "travel_class": "Economy",
+          "flight_number": "AI 4307",
+          "legroom": "28 in",
+          "extensions": [
+            "Below average legroom (28 in)",
+            "In-seat USB outlet",
+            "Stream media to your device",
+            "Carbon emissions estimate: 188 kg"
+          ],
+          "overnight": true
+        }
+      ],
+      "total_duration": 245,
+      "carbon_emissions": {
+        "this_flight": 188000,
+        "typical_for_this_route": 205000,
+        "difference_percent": -8
+      },
+      "price": 176,
+      "type": "One way",
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/AI.png",
+      "booking_token": "WyJDalJJTXpSM1Qwb3RSakZMTURSQlF6TkRVRkZDUnkwdExTMHRMUzB0TFMxMmQyaGpORUZCUVVGQlIzRjVSRkp6UTJGbmNrRkJFZ1pCU1RRek1EY2FDd2praUFFUUFob0RWVk5FT0J4dzVJZ0IiLFtbIkRFTCIsIjIwMjYtMTAtMTUiLCJEWEIiLG51bGwsIkFJIiwiNDMwNyJdXV0="
+    },
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "Indira Gandhi International Airport",
+            "id": "DEL",
+            "time": "2026-10-15 04:10"
+          },
+          "arrival_airport": {
+            "name": "Dubai International Airport",
+            "id": "DXB",
+            "time": "2026-10-15 06:15"
+          },
+          "duration": 215,
+          "airplane": "Boeing 737",
+          "airline": "flydubai",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/FZ.png",
+          "travel_class": "Economy",
+          "flight_number": "FZ 442",
+          "legroom": "30 in",
+          "extensions": [
+            "Average legroom (30 in)",
+            "In-seat USB outlet",
+            "On-demand video",
+            "Carbon emissions estimate: 207 kg"
+          ],
+          "overnight": true,
+          "often_delayed_by_over_30_min": true
+        }
+      ],
+      "total_duration": 215,
+      "carbon_emissions": {
+        "this_flight": 207000,
+        "typical_for_this_route": 205000,
+        "difference_percent": 1
+      },
+      "price": 180,
+      "type": "One way",
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/FZ.png",
+      "booking_token": "WyJDalJJTXpSM1Qwb3RSakZMTURSQlF6TkRVRkZDUnkwdExTMHRMUzB0TFMxMmQyaGpORUZCUVVGQlIzRjVSRkp6UTJGbmNrRkJFZ1ZHV2pRME1ob0xDS09NQVJBQ0dnTlZVMFE0SEhDampBRT0iLFtbIkRFTCIsIjIwMjYtMTAtMTUiLCJEWEIiLG51bGwsIkZaIiwiNDQyIl1dXQ=="
+    },
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "Indira Gandhi International Airport",
+            "id": "DEL",
+            "time": "2026-10-15 19:10"
+          },
+          "arrival_airport": {
+            "name": "Dubai International Airport",
+            "id": "DXB",
+            "time": "2026-10-15 21:25"
+          },
+          "duration": 225,
+          "airplane": "Airbus A321neo",
+          "airline": "IndiGo",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/6E.png",
+          "travel_class": "Economy",
+          "flight_number": "6E 1463",
+          "legroom": "28 in",
+          "extensions": [
+            "Below average legroom (28 in)",
+            "Carbon emissions estimate: 162 kg"
+          ]
+        }
+      ],
+      "total_duration": 225,
+      "carbon_emissions": {
+        "this_flight": 162000,
+        "typical_for_this_route": 205000,
+        "difference_percent": -21
+      },
+      "price": 196,
+      "type": "One way",
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/6E.png",
+      "booking_token": "WyJDalJJTXpSM1Qwb3RSakZMTURSQlF6TkRVRkZDUnkwdExTMHRMUzB0TFMxMmQyaGpORUZCUVVGQlIzRjVSRkp6UTJGbmNrRkJFZ1kyUlRFME5qTWFDd2pKbUFFUUFob0RWVk5FT0J4d3laZ0IiLFtbIkRFTCIsIjIwMjYtMTAtMTUiLCJEWEIiLG51bGwsIjZFIiwiMTQ2MyJdXV0="
+    },
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "Indira Gandhi International Airport",
+            "id": "DEL",
+            "time": "2026-10-15 16:25"
+          },
+          "arrival_airport": {
+            "name": "Dubai International Airport",
+            "id": "DXB",
+            "time": "2026-10-15 18:25"
+          },
+          "duration": 210,
+          "airplane": "Boeing 777",
+          "airline": "Emirates",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/EK.png",
+          "travel_class": "Economy",
+          "flight_number": "EK 517",
+          "legroom": "32 in",
+          "extensions": [
+            "Above average legroom (32 in)",
+            "Wi-Fi for a fee",
+            "In-seat power & USB outlets",
+            "On-demand video",
+            "Carbon emissions estimate: 187 kg"
+          ]
+        }
+      ],
+      "total_duration": 210,
+      "carbon_emissions": {
+        "this_flight": 187000,
+        "typical_for_this_route": 205000,
+        "difference_percent": -9
+      },
+      "price": 206,
+      "type": "One way",
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/EK.png",
+      "booking_token": "WyJDalJJTXpSM1Qwb3RSakZMTURSQlF6TkRVRkZDUnkwdExTMHRMUzB0TFMxMmQyaGpORUZCUVVGQlIzRjVSRkp6UTJGbmNrRkJFZ1ZGU3pVeE54b0xDTXFnQVJBQ0dnTlZVMFE0SEhES29BRT0iLFtbIkRFTCIsIjIwMjYtMTAtMTUiLCJEWEIiLG51bGwsIkVLIiwiNTE3Il1dXQ=="
+    }
+  ],
+  "other_flights": [
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "Indira Gandhi International Airport",
+            "id": "DEL",
+            "time": "2026-10-15 04:55"
+          },
+          "arrival_airport": {
+            "name": "Bahrain International Airport",
+            "id": "BAH",
+            "time": "2026-10-15 06:50"
+          },
+          "duration": 265,
+          "airplane": "Airbus A321neo",
+          "airline": "Gulf Air",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/GF.png",
+          "travel_class": "Economy",
+          "flight_number": "GF 131",
+          "legroom": "31 in",
+          "extensions": [
+            "Average legroom (31 in)",
+            "In-seat power & USB outlets",
+            "Stream media to your device",
+            "Carbon emissions estimate: 214 kg"
+          ],
+          "overnight": true
+        },
+        {
+          "departure_airport": {
+            "name": "Bahrain International Airport",
+            "id": "BAH",
+            "time": "2026-10-15 20:05"
+          },
+          "arrival_airport": {
+            "name": "Dubai International Airport",
+            "id": "DXB",
+            "time": "2026-10-15 22:35"
+          },
+          "duration": 90,
+          "airplane": "Airbus A321neo",
+          "airline": "Gulf Air",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/GF.png",
+          "travel_class": "Economy",
+          "flight_number": "GF 512",
+          "legroom": "31 in",
+          "extensions": [
+            "Average legroom (31 in)",
+            "Free Wi-Fi",
+            "In-seat power & USB outlets",
+            "On-demand video",
+            "Carbon emissions estimate: 67 kg"
+          ]
+        }
+      ],
+      "layovers": [
+        {
+          "duration": 795,
+          "name": "Bahrain International Airport",
+          "id": "BAH"
+        }
+      ],
+      "total_duration": 1150,
+      "carbon_emissions": {
+        "this_flight": 282000,
+        "typical_for_this_route": 205000,
+        "difference_percent": 38
+      },
+      "price": 171,
+      "type": "One way",
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/GF.png",
+      "booking_token": "WyJDalJJTXpSM1Qwb3RSakZMTURSQlF6TkRVRkZDUnkwdExTMHRMUzB0TFMxMmQyaGpORUZCUVVGQlIzRjVSRkp6UTJGbmNrRkJFZ3RIUmpFek1YeEhSalV4TWhvTENLYUZBUkFDR2dOVlUwUTRISENtaFFFPSIsW1siREVMIiwiMjAyNi0xMC0xNSIsIkJBSCIsbnVsbCwiR0YiLCIxMzEiXSxbIkJBSCIsIjIwMjYtMTAtMTUiLCJEWEIiLG51bGwsIkdGIiwiNTEyIl1dXQ=="
+    },
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "Indira Gandhi International Airport",
+            "id": "DEL",
+            "time": "2026-10-15 21:50"
+          },
+          "arrival_airport": {
+            "name": "Bahrain International Airport",
+            "id": "BAH",
+            "time": "2026-10-15 23:45"
+          },
+          "duration": 265,
+          "airplane": "Airbus A321neo",
+          "airline": "Gulf Air",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/GF.png",
+          "travel_class": "Economy",
+          "flight_number": "GF 135",
+          "legroom": "31 in",
+          "extensions": [
+            "Average legroom (31 in)",
+            "In-seat power & USB outlets",
+            "Stream media to your device",
+            "Carbon emissions estimate: 214 kg"
+          ]
+        },
+        {
+          "departure_airport": {
+            "name": "Bahrain International Airport",
+            "id": "BAH",
+            "time": "2026-10-16 13:30"
+          },
+          "arrival_airport": {
+            "name": "Dubai International Airport",
+            "id": "DXB",
+            "time": "2026-10-16 15:55"
+          },
+          "duration": 85,
+          "airplane": "Airbus A320",
+          "airline": "Gulf Air",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/GF.png",
+          "travel_class": "Economy",
+          "flight_number": "GF 506",
+          "legroom": "32 in",
+          "extensions": [
+            "Above average legroom (32 in)",
+            "In-seat power outlet",
+            "Stream media to your device",
+            "Carbon emissions estimate: 81 kg"
+          ]
+        }
+      ],
+      "layovers": [
+        {
+          "duration": 825,
+          "name": "Bahrain International Airport",
+          "id": "BAH"
+        }
+      ],
+      "total_duration": 1175,
+      "carbon_emissions": {
+        "this_flight": 296000,
+        "typical_for_this_route": 205000,
+        "difference_percent": 44
+      },
+      "price": 171,
+      "type": "One way",
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/GF.png",
+      "booking_token": "WyJDalJJTXpSM1Qwb3RSakZMTURSQlF6TkRVRkZDUnkwdExTMHRMUzB0TFMxMmQyaGpORUZCUVVGQlIzRjVSRkp6UTJGbmNrRkJFZ3RIUmpFek5YeEhSalV3TmhvTENLYUZBUkFDR2dOVlUwUTRISENtaFFFPSIsW1siREVMIiwiMjAyNi0xMC0xNSIsIkJBSCIsbnVsbCwiR0YiLCIxMzUiXSxbIkJBSCIsIjIwMjYtMTAtMTYiLCJEWEIiLG51bGwsIkdGIiwiNTA2Il1dXQ=="
+    },
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "Indira Gandhi International Airport",
+            "id": "DEL",
+            "time": "2026-10-15 07:45"
+          },
+          "arrival_airport": {
+            "name": "Kuwait International Airport",
+            "id": "KWI",
+            "time": "2026-10-15 10:05"
+          },
+          "duration": 290,
+          "airplane": "Airbus A320",
+          "airline": "Jazeera",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/J9.png",
+          "travel_class": "Economy",
+          "flight_number": "J9 410",
+          "legroom": "28 in",
+          "extensions": [
+            "Below average legroom (28 in)",
+            "In-seat USB outlet",
+            "Carbon emissions estimate: 246 kg"
+          ]
+        },
+        {
+          "departure_airport": {
+            "name": "Kuwait International Airport",
+            "id": "KWI",
+            "time": "2026-10-15 13:00"
+          },
+          "arrival_airport": {
+            "name": "Dubai International Airport",
+            "id": "DXB",
+            "time": "2026-10-15 16:00"
+          },
+          "duration": 120,
+          "airplane": "Airbus A320neo",
+          "airline": "Jazeera",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/J9.png",
+          "travel_class": "Economy",
+          "flight_number": "J9 123",
+          "legroom": "28 in",
+          "extensions": [
+            "Below average legroom (28 in)",
+            "In-seat USB outlet",
+            "Carbon emissions estimate: 76 kg"
+          ]
+        }
+      ],
+      "layovers": [
+        {
+          "duration": 175,
+          "name": "Kuwait International Airport",
+          "id": "KWI"
+        }
+      ],
+      "total_duration": 585,
+      "carbon_emissions": {
+        "this_flight": 323000,
+        "typical_for_this_route": 205000,
+        "difference_percent": 58
+      },
+      "price": 176,
+      "type": "One way",
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/J9.png",
+      "booking_token": "WyJDalJJTXpSM1Qwb3RSakZMTURSQlF6TkRVRkZDUnkwdExTMHRMUzB0TFMxMmQyaGpORUZCUVVGQlIzRjVSRkp6UTJGbmNrRkJFZ3RLT1RReE1IeEtPVEV5TXhvTENMdUpBUkFDR2dOVlUwUTRISEM3aVFFPSIsW1siREVMIiwiMjAyNi0xMC0xNSIsIktXSSIsbnVsbCwiSjkiLCI0MTAiXSxbIktXSSIsIjIwMjYtMTAtMTUiLCJEWEIiLG51bGwsIko5IiwiMTIzIl1dXQ=="
+    },
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "Indira Gandhi International Airport",
+            "id": "DEL",
+            "time": "2026-10-15 08:35"
+          },
+          "arrival_airport": {
+            "name": "Dubai International Airport",
+            "id": "DXB",
+            "time": "2026-10-15 10:50"
+          },
+          "duration": 225,
+          "airplane": "Airbus A321neo",
+          "airline": "IndiGo",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/6E.png",
+          "travel_class": "Economy",
+          "flight_number": "6E 1461",
+          "legroom": "28 in",
+          "extensions": [
+            "Below average legroom (28 in)",
+            "Carbon emissions estimate: 162 kg"
+          ]
+        }
+      ],
+      "total_duration": 225,
+      "carbon_emissions": {
+        "this_flight": 162000,
+        "typical_for_this_route": 205000,
+        "difference_percent": -21
+      },
+      "price": 196,
+      "type": "One way",
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/6E.png",
+      "booking_token": "WyJDalJJTXpSM1Qwb3RSakZMTURSQlF6TkRVRkZDUnkwdExTMHRMUzB0TFMxMmQyaGpORUZCUVVGQlIzRjVSRkp6UTJGbmNrRkJFZ1kyUlRFME5qRWFDd2pKbUFFUUFob0RWVk5FT0J4d3laZ0IiLFtbIkRFTCIsIjIwMjYtMTAtMTUiLCJEWEIiLG51bGwsIjZFIiwiMTQ2MSJdXV0="
+    },
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "Indira Gandhi International Airport",
+            "id": "DEL",
+            "time": "2026-10-15 22:05"
+          },
+          "arrival_airport": {
+            "name": "Dubai International Airport",
+            "id": "DXB",
+            "time": "2026-10-16 00:05"
+          },
+          "duration": 210,
+          "airplane": "Boeing 777",
+          "airline": "Emirates",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/EK.png",
+          "travel_class": "Economy",
+          "flight_number": "EK 515",
+          "legroom": "32 in",
+          "extensions": [
+            "Above average legroom (32 in)",
+            "Wi-Fi for a fee",
+            "In-seat power & USB outlets",
+            "On-demand video",
+            "Carbon emissions estimate: 187 kg"
+          ]
+        }
+      ],
+      "total_duration": 210,
+      "carbon_emissions": {
+        "this_flight": 187000,
+        "typical_for_this_route": 205000,
+        "difference_percent": -9
+      },
+      "price": 206,
+      "type": "One way",
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/EK.png",
+      "booking_token": "WyJDalJJTXpSM1Qwb3RSakZMTURSQlF6TkRVRkZDUnkwdExTMHRMUzB0TFMxMmQyaGpORUZCUVVGQlIzRjVSRkp6UTJGbmNrRkJFZ1ZGU3pVeE5Sb0xDTXFnQVJBQ0dnTlZVMFE0SEhES29BRT0iLFtbIkRFTCIsIjIwMjYtMTAtMTUiLCJEWEIiLG51bGwsIkVLIiwiNTE1Il1dXQ=="
+    },
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "Indira Gandhi International Airport",
+            "id": "DEL",
+            "time": "2026-10-15 20:45"
+          },
+          "arrival_airport": {
+            "name": "Dubai International Airport",
+            "id": "DXB",
+            "time": "2026-10-15 23:00"
+          },
+          "duration": 225,
+          "airplane": "Boeing 787",
+          "airline": "Air India",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/AI.png",
+          "travel_class": "Economy",
+          "flight_number": "AI 4305",
+          "legroom": "32 in",
+          "extensions": [
+            "Above average legroom (32 in)",
+            "Wi-Fi for a fee",
+            "In-seat USB outlet",
+            "On-demand video",
+            "Carbon emissions estimate: 180 kg"
+          ]
+        }
+      ],
+      "total_duration": 225,
+      "carbon_emissions": {
+        "this_flight": 180000,
+        "typical_for_this_route": 205000,
+        "difference_percent": -12
+      },
+      "price": 231,
+      "type": "One way",
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/AI.png",
+      "booking_token": "WyJDalJJTXpSM1Qwb3RSakZMTURSQlF6TkRVRkZDUnkwdExTMHRMUzB0TFMxMmQyaGpORUZCUVVGQlIzRjVSRkp6UTJGbmNrRkJFZ1pCU1RRek1EVWFDd2lIdEFFUUFob0RWVk5FT0J4d2g3UUIiLFtbIkRFTCIsIjIwMjYtMTAtMTUiLCJEWEIiLG51bGwsIkFJIiwiNDMwNSJdXV0="
+    },
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "Indira Gandhi International Airport",
+            "id": "DEL",
+            "time": "2026-10-15 04:25"
+          },
+          "arrival_airport": {
+            "name": "Dubai International Airport",
+            "id": "DXB",
+            "time": "2026-10-15 06:25"
+          },
+          "duration": 210,
+          "airplane": "Boeing 777",
+          "airline": "Emirates",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/EK.png",
+          "travel_class": "Economy",
+          "flight_number": "EK 513",
+          "legroom": "32 in",
+          "extensions": [
+            "Above average legroom (32 in)",
+            "Wi-Fi for a fee",
+            "In-seat power & USB outlets",
+            "On-demand video",
+            "Carbon emissions estimate: 187 kg"
+          ],
+          "overnight": true,
+          "often_delayed_by_over_30_min": true
+        }
+      ],
+      "total_duration": 210,
+      "carbon_emissions": {
+        "this_flight": 187000,
+        "typical_for_this_route": 205000,
+        "difference_percent": -9
+      },
+      "price": 233,
+      "type": "One way",
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/EK.png",
+      "booking_token": "WyJDalJJTXpSM1Qwb3RSakZMTURSQlF6TkRVRkZDUnkwdExTMHRMUzB0TFMxMmQyaGpORUZCUVVGQlIzRjVSRkp6UTJGbmNrRkJFZ1ZGU3pVeE14b0xDSzYxQVJBQ0dnTlZVMFE0SEhDdXRRRT0iLFtbIkRFTCIsIjIwMjYtMTAtMTUiLCJEWEIiLG51bGwsIkVLIiwiNTEzIl1dXQ=="
+    },
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "Indira Gandhi International Airport",
+            "id": "DEL",
+            "time": "2026-10-15 11:00"
+          },
+          "arrival_airport": {
+            "name": "Dubai International Airport",
+            "id": "DXB",
+            "time": "2026-10-15 13:00"
+          },
+          "duration": 210,
+          "airplane": "Boeing 777",
+          "airline": "Emirates",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/EK.png",
+          "travel_class": "Economy",
+          "flight_number": "EK 511",
+          "legroom": "32 in",
+          "extensions": [
+            "Above average legroom (32 in)",
+            "Wi-Fi for a fee",
+            "In-seat power & USB outlets",
+            "On-demand video",
+            "Carbon emissions estimate: 187 kg"
+          ],
+          "often_delayed_by_over_30_min": true
+        }
+      ],
+      "total_duration": 210,
+      "carbon_emissions": {
+        "this_flight": 187000,
+        "typical_for_this_route": 205000,
+        "difference_percent": -9
+      },
+      "price": 233,
+      "type": "One way",
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/EK.png",
+      "booking_token": "WyJDalJJTXpSM1Qwb3RSakZMTURSQlF6TkRVRkZDUnkwdExTMHRMUzB0TFMxMmQyaGpORUZCUVVGQlIzRjVSRkp6UTJGbmNrRkJFZ1ZGU3pVeE1Sb0xDSzYxQVJBQ0dnTlZVMFE0SEhDdXRRRT0iLFtbIkRFTCIsIjIwMjYtMTAtMTUiLCJEWEIiLG51bGwsIkVLIiwiNTExIl1dXQ=="
+    },
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "Indira Gandhi International Airport",
+            "id": "DEL",
+            "time": "2026-10-15 11:45"
+          },
+          "arrival_airport": {
+            "name": "Dubai International Airport",
+            "id": "DXB",
+            "time": "2026-10-15 14:00"
+          },
+          "duration": 225,
+          "airplane": "Boeing 787",
+          "airline": "Air India",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/AI.png",
+          "travel_class": "Economy",
+          "flight_number": "AI 4209",
+          "legroom": "33 in",
+          "extensions": [
+            "Above average legroom (33 in)",
+            "In-seat power & USB outlets",
+            "Stream media to your device",
+            "Carbon emissions estimate: 185 kg"
+          ]
+        }
+      ],
+      "total_duration": 225,
+      "carbon_emissions": {
+        "this_flight": 186000,
+        "typical_for_this_route": 205000,
+        "difference_percent": -9
+      },
+      "price": 273,
+      "type": "One way",
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/AI.png",
+      "booking_token": "WyJDalJJTXpSM1Qwb3RSakZMTURSQlF6TkRVRkZDUnkwdExTMHRMUzB0TFMxMmQyaGpORUZCUVVGQlIzRjVSRkp6UTJGbmNrRkJFZ1pCU1RReU1Ea2FDd2lIMVFFUUFob0RWVk5FT0J4d2g5VUIiLFtbIkRFTCIsIjIwMjYtMTAtMTUiLCJEWEIiLG51bGwsIkFJIiwiNDIwOSJdXV0="
+    },
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "Indira Gandhi International Airport",
+            "id": "DEL",
+            "time": "2026-10-15 15:00"
+          },
+          "arrival_airport": {
+            "name": "Dubai International Airport",
+            "id": "DXB",
+            "time": "2026-10-15 17:45"
+          },
+          "duration": 255,
+          "airplane": "Boeing 787",
+          "airline": "Air India",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/AI.png",
+          "travel_class": "Economy",
+          "flight_number": "AI 4309",
+          "legroom": "33 in",
+          "extensions": [
+            "Above average legroom (33 in)",
+            "In-seat power & USB outlets",
+            "Stream media to your device",
+            "Carbon emissions estimate: 185 kg"
+          ]
+        }
+      ],
+      "total_duration": 255,
+      "carbon_emissions": {
+        "this_flight": 186000,
+        "typical_for_this_route": 205000,
+        "difference_percent": -9
+      },
+      "price": 273,
+      "type": "One way",
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/AI.png",
+      "booking_token": "WyJDalJJTXpSM1Qwb3RSakZMTURSQlF6TkRVRkZDUnkwdExTMHRMUzB0TFMxMmQyaGpORUZCUVVGQlIzRjVSRkp6UTJGbmNrRkJFZ1pCU1RRek1Ea2FDd2lIMVFFUUFob0RWVk5FT0J4d2g5VUIiLFtbIkRFTCIsIjIwMjYtMTAtMTUiLCJEWEIiLG51bGwsIkFJIiwiNDMwOSJdXV0="
+    },
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "Indira Gandhi International Airport",
+            "id": "DEL",
+            "time": "2026-10-15 08:30"
+          },
+          "arrival_airport": {
+            "name": "Dubai International Airport",
+            "id": "DXB",
+            "time": "2026-10-15 11:15"
+          },
+          "duration": 255,
+          "airplane": "Airbus A320",
+          "airline": "SpiceJet",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/SG.png",
+          "travel_class": "Economy",
+          "flight_number": "SG 5111",
+          "legroom": "28 in",
+          "extensions": [
+            "Below average legroom (28 in)",
+            "Carbon emissions estimate: 195 kg"
+          ]
+        }
+      ],
+      "total_duration": 255,
+      "carbon_emissions": {
+        "this_flight": 196000,
+        "typical_for_this_route": 205000,
+        "difference_percent": -4
+      },
+      "price": 761,
+      "type": "One way",
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/SG.png",
+      "booking_token": "WyJDalJJTXpSM1Qwb3RSakZMTURSQlF6TkRVRkZDUnkwdExTMHRMUzB0TFMxMmQyaGpORUZCUVVGQlIzRjVSRkp6UTJGbmNrRkJFZ1pUUnpVeE1URWFDd2luMGdRUUFob0RWVk5FT0J4d3A5SUUiLFtbIkRFTCIsIjIwMjYtMTAtMTUiLCJEWEIiLG51bGwsIlNHIiwiNTExMSJdXV0="
+    },
+    {
+      "flights": [
+        {
+          "departure_airport": {
+            "name": "Indira Gandhi International Airport",
+            "id": "DEL",
+            "time": "2026-10-15 22:10"
+          },
+          "arrival_airport": {
+            "name": "Dubai International Airport",
+            "id": "DXB",
+            "time": "2026-10-16 00:55"
+          },
+          "duration": 255,
+          "airplane": "Airbus A320",
+          "airline": "SpiceJet",
+          "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/SG.png",
+          "travel_class": "Economy",
+          "flight_number": "SG 5105",
+          "legroom": "28 in",
+          "extensions": [
+            "Below average legroom (28 in)",
+            "Carbon emissions estimate: 195 kg"
+          ]
+        }
+      ],
+      "total_duration": 255,
+      "carbon_emissions": {
+        "this_flight": 196000,
+        "typical_for_this_route": 205000,
+        "difference_percent": -4
+      },
+      "price": 761,
+      "type": "One way",
+      "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/SG.png",
+      "booking_token": "WyJDalJJTXpSM1Qwb3RSakZMTURSQlF6TkRVRkZDUnkwdExTMHRMUzB0TFMxMmQyaGpORUZCUVVGQlIzRjVSRkp6UTJGbmNrRkJFZ1pUUnpVeE1EVWFDd2luMGdRUUFob0RWVk5FT0J4d3A5SUUiLFtbIkRFTCIsIjIwMjYtMTAtMTUiLCJEWEIiLG51bGwsIlNHIiwiNTEwNSJdXV0="
+    }
+  ],
+  "price_insights": {
+    "lowest_price": 171,
+    "price_level": "typical",
+    "typical_price_range": [
+      145,
+      175
+    ],
+    "price_history": [
+      [
+        1784745000,
+        170
+      ],
+      [
+        1784831400,
+        170
+      ],
+      [
+        1784917800,
+        170
+      ],
+      [
+        1785004200,
+        170
+      ],
+      [
+        1785090600,
+        170
+      ],
+      [
+        1785177000,
+        170
+      ],
+      [
+        1785263400,
+        171
+      ],
+      [
+        1785349800,
+        171
+      ],
+      [
+        1785436200,
+        171
+      ],
+      [
+        1785522600,
+        171
+      ],
+      [
+        1785609000,
+        171
+      ],
+      [
+        1785695400,
+        171
+      ],
+      [
+        1785781800,
+        171
+      ],
+      [
+        1785868200,
+        171
+      ],
+      [
+        1785954600,
+        172
+      ],
+      [
+        1786041000,
+        171
+      ],
+      [
+        1786127400,
+        171
+      ],
+      [
+        1786213800,
+        171
+      ],
+      [
+        1786300200,
+        171
+      ],
+      [
+        1786386600,
+        171
+      ],
+      [
+        1786473000,
+        171
+      ],
+      [
+        1786559400,
+        171
+      ],
+      [
+        1786645800,
+        171
+      ],
+      [
+        1786732200,
+        171
+      ],
+      [
+        1786818600,
+        171
+      ],
+      [
+        1786905000,
+        171
+      ],
+      [
+        1786991400,
+        171
+      ],
+      [
+        1787077800,
+        171
+      ],
+      [
+        1787164200,
+        171
+      ],
+      [
+        1787250600,
+        171
+      ],
+      [
+        1787337000,
+        171
+      ],
+      [
+        1787423400,
+        171
+      ],
+      [
+        1787509800,
+        171
+      ],
+      [
+        1787596200,
+        171
+      ],
+      [
+        1787682600,
+        171
+      ],
+      [
+        1787769000,
+        170
+      ],
+      [
+        1787855400,
+        171
+      ],
+      [
+        1787941800,
+        171
+      ],
+      [
+        1788028200,
+        171
+      ],
+      [
+        1788114600,
+        171
+      ],
+      [
+        1788201000,
+        172
+      ],
+      [
+        1788287400,
+        172
+      ],
+      [
+        1788373800,
+        172
+      ],
+      [
+        1788460200,
+        172
+      ],
+      [
+        1788546600,
+        172
+      ],
+      [
+        1788633000,
+        172
+      ],
+      [
+        1788719400,
+        172
+      ],
+      [
+        1788805800,
+        172
+      ],
+      [
+        1788892200,
+        171
+      ],
+      [
+        1788978600,
+        171
+      ],
+      [
+        1789065000,
+        170
+      ],
+      [
+        1789151400,
+        171
+      ],
+      [
+        1789237800,
+        171
+      ],
+      [
+        1789324200,
+        171
+      ],
+      [
+        1789410600,
+        171
+      ],
+      [
+        1789497000,
+        170
+      ],
+      [
+        1789583400,
+        170
+      ],
+      [
+        1789669800,
+        171
+      ],
+      [
+        1789756200,
+        171
+      ],
+      [
+        1789842600,
+        171
+      ],
+      [
+        1789929000,
+        171
+      ],
+      [
+        1790015400,
+        171
+      ]
+    ]
+  },
+  "airports": [
+    {
+      "departure": [
+        {
+          "airport": {
+            "id": "DEL",
+            "name": "Indira Gandhi International Airport"
+          },
+          "city": "New Delhi",
+          "country": "India",
+          "country_code": "IN",
+          "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRkRqzwP-0z4pH29-KifVzfrxM5wwXx56g3Hoo_ebldH9Fy8a8EjGqPzd3fZqJSKoE5tSIRC2iGJxgqzQ",
+          "thumbnail": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSY7HqndXM-ihFCu1qUKosYR--X_yXSd-0mkQHeSUaG5rkpq5Y6uxD8CMmYUCdngZE7mV0onuN2zv_aVxGGO8xv4FMcpMlWvbXdvJFcemY"
+        }
+      ],
+      "arrival": [
+        {
+          "airport": {
+            "id": "DXB",
+            "name": "Dubai International Airport"
+          },
+          "city": "Dubai",
+          "country": "United Arab Emirates",
+          "country_code": "AE",
+          "image": "https://encrypted-tbn2.gstatic.com/images?q=tbn:ANd9GcRegWMQBRhDOeg2gvll8nGXsG1-OPqD2V0EvCN1Ni2Poe9hGY8CBps9mRaAyrAz8Jvsvl292aI62fq43A",
+          "thumbnail": "https://encrypted-tbn2.gstatic.com/images?q=tbn:ANd9GcQDaD8FERvoI4iorjkWbED9zAq7S3m9hD1t5vGNU5Jznr1Kl1em9SIs9c9VkujJF5_EDvC5mKyqcQ9B8PApW9tiwfzhK_pC2qvRBND2Plo"
+        }
+      ]
+    }
+  ]
+}
