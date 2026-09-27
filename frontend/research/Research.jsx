@@ -31,12 +31,13 @@ function buildRefNumbers(report, evidence) {
   };
 }
 
-// clean stroke icons — no text glyphs in the rail
-function PlusSvg() {
+// new-chat icon (ChatGPT-style square-pen) — exact reference SVG
+function NewChatSvg() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth={2.2} strokeLinecap="round" aria-hidden="true">
-      <path d="M12 5v14M5 12h14" />
+      strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" role="img" aria-label="New chat">
+      <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+      <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z" />
     </svg>
   );
 }
@@ -242,8 +243,8 @@ export default function Research() {
               </span>
             )}
           </div>
-          <button className="rs-top-btn" onClick={newChat} aria-label="New research">
-            <PlusSvg />
+          <button className="rs-top-btn" onClick={newChat} aria-label="New chat">
+            <NewChatSvg />
           </button>
         </header>
 
@@ -415,8 +416,8 @@ export default function Research() {
 
       {/* thin icon rail — right side, always visible */}
       <aside className="rs-rail" aria-label="Primary">
-        <button className="rs-rail-btn rs-rail-new" title="New research" onClick={newChat}>
-          <PlusSvg />
+        <button className="rs-rail-btn rs-rail-new" title="New chat" onClick={newChat}>
+          <NewChatSvg />
         </button>
         <button
           className={`rs-rail-btn${panelOpen ? " active" : ""}`}
