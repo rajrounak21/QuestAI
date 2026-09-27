@@ -53,6 +53,16 @@ function PanelSvg() {
   );
 }
 
+function HomeSvg() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 10.5 12 3l9 7.5" />
+      <path d="M5 9.5V21h14V9.5" />
+    </svg>
+  );
+}
+
 export default function Research() {
   const navigate = useNavigate();
   const { sessionId } = useParams();
@@ -427,6 +437,10 @@ export default function Research() {
         >
           <PanelSvg />
         </button>
+        <div className="rs-rail-spacer" />
+        <Link to="/home" className="rs-rail-btn" title="Home" aria-label="Home">
+          <HomeSvg />
+        </Link>
       </aside>
 
       {/* sessions — slide-over panel from right, all screens */}

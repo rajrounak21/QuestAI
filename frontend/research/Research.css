@@ -31,6 +31,8 @@
 .rs-rail-btn:hover { color: var(--text); background: var(--soft); }
 .rs-rail-btn.active { color: var(--accent); border-color: rgba(91,124,255,.4); background: rgba(91,124,255,.1); }
 .rs-rail-btn svg { display: block; }
+a.rs-rail-btn { text-decoration: none; }
+.rs-rail-spacer { flex: 1; }
 .rs-rail-new { color: var(--text); background: var(--soft); border-color: var(--line); }
 
 /* ---- main document ---- */
