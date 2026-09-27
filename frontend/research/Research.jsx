@@ -227,6 +227,9 @@ export default function Research() {
       {/* report workspace */}
       <main className="rs-main">
         <header className="rs-top">
+          <button className="rs-top-btn" onClick={() => setPanelOpen(true)} aria-label="Open sessions">
+            <PanelSvg />
+          </button>
           <div className="rs-title">
             <h1>{doc?.query || "Research"}</h1>
             {doc && (
@@ -239,6 +242,9 @@ export default function Research() {
               </span>
             )}
           </div>
+          <button className="rs-top-btn" onClick={newChat} aria-label="New research">
+            <PlusSvg />
+          </button>
         </header>
 
         {notice && <p className="rs-notice">{notice}</p>}
