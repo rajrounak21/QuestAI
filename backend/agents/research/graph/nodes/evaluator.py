@@ -5,6 +5,7 @@ from typing import Any
 
 from backend.agents.research.graph.state import ResearchState
 from backend.agents.research.schemas.sources import ProcessedSource, SearchResult, SourceType
+from backend.agents.research.services.progress import report as report_progress
 from backend.agents.research.services.source_processor import extract_evidence, process_sources
 
 logger = logging.getLogger(__name__)
@@ -12,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 def evaluator_node(state: ResearchState) -> dict[str, Any]:
     logger.info("Running evaluator node")
+    report_progress("searching", "Extracting evidence")
 
     raw = state.get("raw_results", [])
     searches_this_round = state.get("searches_performed", [])

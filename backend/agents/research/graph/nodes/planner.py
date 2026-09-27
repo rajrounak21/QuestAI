@@ -9,6 +9,7 @@ from datetime import date
 
 from backend.agents.research.graph.state import ResearchState
 from backend.agents.research.services.llm import init_llm
+from backend.agents.research.services.progress import report as report_progress
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,7 @@ User research goal: {goal}"""
 
 def planner_node(state: ResearchState) -> dict[str, Any]:
     logger.info("Running planner node")
+    report_progress("planning", "Building research plan")
 
     user_query = state["user_query"]
     today = date.today()

@@ -7,6 +7,7 @@ from typing import Any
 
 from backend.agents.research.graph.state import ResearchState
 from backend.agents.research.services.llm import init_llm
+from backend.agents.research.services.progress import report as report_progress
 
 logger = logging.getLogger(__name__)
 
@@ -212,6 +213,7 @@ def _fallback_validate(report, evidence):
 
 def validator_node(state: ResearchState) -> dict[str, Any]:
     logger.info("Running validator node")
+    report_progress("validating", "Checking every claim")
 
     report = state.get("final_report")
     if not report:

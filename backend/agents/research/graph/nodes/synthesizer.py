@@ -7,6 +7,7 @@ from typing import Any
 
 from backend.agents.research.graph.state import ResearchState
 from backend.agents.research.services.llm import init_llm
+from backend.agents.research.services.progress import report as report_progress
 from backend.agents.research.services.source_processor import select_evidence
 
 logger = logging.getLogger(__name__)
@@ -162,6 +163,10 @@ def _format_findings_for_feedback(report):
 
 def synthesizer_node(state):
     logger.info("Running synthesizer node")
+    report_progress(
+        "synthesizing",
+        "Rewriting report" if state.get("resynthesis_count") else "Writing report",
+    )
 
     plan = state.get("research_plan", {})
     evidence = state.get("evidence", [])

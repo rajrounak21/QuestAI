@@ -7,7 +7,12 @@ import "./Research.css";
 
 const POLL_MS = 3000;
 const POLL_MAX = 40;
-const PIPE_STEPS = ["Planning", "Searching", "Synthesizing", "Validating"];
+const STAGES = [
+  { key: "planning", label: "Planning" },
+  { key: "searching", label: "Searching" },
+  { key: "synthesizing", label: "Synthesizing" },
+  { key: "validating", label: "Validating" },
+];
 
 function statusDot(status) {
 
@@ -261,17 +266,31 @@ export default function Research() {
 
         {notice && <p className="rs-notice">{notice}</p>}
 
-        {running && (
-          <section className="rs-pipe" aria-live="polite">
-            {PIPE_STEPS.map((s, i) => (
-              <span key={s} className="rs-pipe-step">
-                <span className="rs-pulse" style={{ animationDelay: `${i * 0.25}s` }} />
-                {s}
+        {running && (() => {
+          const stage = doc?.progress?.stage;
+          const detail = doc?.progress?.detail;
+          const found = STAGES.findIndex((s) => s.key === stage);
+          const cur = found < 0 ? 0 : found;
+          return (
+            <section className="rs-pipe" aria-live="polite">
+              {STAGES.map((s, i) => (
+                <span key={s.key} className={`rs-pipe-step${i > cur ? " rs-pipe-todo" : ""}`}>
+                  {i < cur ? (
+                    <span className="rs-done">✓</span>
+                  ) : i === cur ? (
+                    <span className="rs-pulse" />
+                  ) : (
+                    <span className="rs-todo-dot" />
+                  )}
+                  {s.label}
+                </span>
+              ))}
+              <span className="rs-pipe-time">
+                {detail || "Starting…"} · {elapsed}s
               </span>
-            ))}
-            <span className="rs-pipe-time">{elapsed}s · input locked until done</span>
-          </section>
-        )}
+            </section>
+          );
+        })()}
 
         {loading ? (
           <p className="rs-loading">Loading workspace...</p>

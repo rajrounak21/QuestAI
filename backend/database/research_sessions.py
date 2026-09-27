@@ -120,6 +120,17 @@ def doc_to_session_data(doc: dict[str, Any] | None, fallback_session_id: str):
     )
 
 
+def set_progress(user_id: str, session_id: str, stage: str, detail: str = "") -> None:
+    """Live stage marker for the 202+poll UX. Stages: planning|searching|synthesizing|validating|done|failed."""
+    from backend.database.collections import get_research_collection
+
+    now = _utcnow()
+    get_research_collection().update_one(
+        {"user_id": user_id, "session_id": session_id},
+        {"$set": {"progress": {"stage": stage, "detail": detail, "at": now}, "updated_at": now}},
+    )
+
+
 # ---- Thin DB ops (called by API layer later, not by the agent) ----
 
 def insert_new_session(

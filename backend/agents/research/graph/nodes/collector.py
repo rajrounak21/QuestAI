@@ -5,6 +5,7 @@ from typing import Any
 
 from backend.agents.research.graph.state import ResearchState
 from backend.agents.research.schemas.sources import SourceType
+from backend.agents.research.services.progress import report as report_progress
 from backend.agents.research.tools.search import search
 
 logger = logging.getLogger(__name__)
@@ -23,6 +24,7 @@ def collector_node(state: ResearchState) -> dict[str, Any]:
     if not queries:
         return {"raw_results": [], "searches_performed": []}
 
+    report_progress("searching", f"Searching {len(queries)} queries")
     already_done = {
         s.get("query", "") for s in state.get("searches_performed", [])
     }

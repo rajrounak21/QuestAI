@@ -17,6 +17,7 @@ from backend.database.research_sessions import (
     list_history,
 )
 from backend.agents.research.memory.session import build_context_for_question
+from backend.agents.research.services.progress import clear_target, report, set_target
 from backend.agents.research.services.topic_check import route_session
 
 logger = logging.getLogger(__name__)
@@ -52,9 +53,12 @@ def _run_and_persist(
 ) -> None:
     """Blocking graph run in a worker thread. Never raises to the client."""
     from backend.agents.research.main import run_research
+    from backend.database.research_sessions import set_progress
 
     col = get_research_collection()
+    token = set_target(user_id, session_id)
     try:
+        report("planning", "Starting research")
         # Scratch uuid: keeps server's in-memory SessionMemory out of the
         # persistence path (Mongo doc is the source of truth, no double context).
         result = run_research(effective_query, session_id=str(uuid.uuid4()), max_rounds=max_rounds)
@@ -67,12 +71,16 @@ def _run_and_persist(
             user_text=raw_query,
             assistant_answer=result.get("formatted", ""),
         )
+        set_progress(user_id, session_id, "done", "Report ready")
     except Exception as e:
         logger.exception(f"Research run failed session={session_id}: {e}")
         col.update_one(
             {"user_id": user_id, "session_id": session_id},
             {"$set": {"status": "failed", "error": str(e)[:500]}},
         )
+        set_progress(user_id, session_id, "failed", str(e)[:200])
+    finally:
+        clear_target(token)
 
 
 @router.post("/run", status_code=202)

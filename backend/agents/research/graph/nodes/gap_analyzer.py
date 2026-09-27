@@ -13,6 +13,7 @@ from typing import Any
 
 from backend.agents.research.graph.state import ResearchState
 from backend.agents.research.services.llm import init_llm_qwen
+from backend.agents.research.services.progress import report as report_progress
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +53,10 @@ def _parse_json(text: str) -> dict[str, Any]:
 
 def gap_analyzer_node(state: ResearchState) -> dict[str, Any]:
     logger.info("Running gap_analyzer node")
+    report_progress(
+        "searching",
+        f"Round {state.get('current_round', 1)}/{state.get('max_rounds', 3)}: checking gaps",
+    )
 
     plan = state.get("research_plan", {})
     evidence = state.get("evidence", [])

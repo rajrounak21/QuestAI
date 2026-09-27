@@ -81,6 +81,12 @@ a.rs-rail-btn { text-decoration: none; }
   font-size: 13px; color: var(--muted);
 }
 .rs-pipe-step { display: inline-flex; align-items: center; gap: 7px; }
+.rs-pipe-todo { opacity: 0.4; }
+.rs-done { color: #34a853; font-weight: 700; }
+.rs-todo-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  border: 1px solid var(--faint);
+}
 .rs-pipe-time { margin-left: auto; color: var(--faint); }
 .rs-pulse {
   width: 8px; height: 8px; border-radius: 50%;
