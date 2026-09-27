@@ -42,18 +42,11 @@
   padding: 28px 28px 140px;
   position: relative;
 }
-.rs-top h1 { font-family: var(--display); font-size: clamp(20px, 2.4vw, 28px); letter-spacing: -0.02em; margin: 0 0 4px; }
-.rs-head-new {
-  flex-shrink: 0;
-  width: 38px; height: 38px;
-  display: grid; place-items: center;
-  border: 1px solid transparent;
-  background: transparent; color: var(--muted);
-  border-radius: 12px; cursor: pointer;
-  margin-top: 2px;
+.rs-top {
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
 }
-.rs-head-new:hover { color: var(--text); background: var(--soft); }
-.rs-head-new svg { display: block; }
+.rs-top h1 { font-family: var(--display); font-size: clamp(20px, 2.4vw, 28px); letter-spacing: -0.02em; margin: 0 0 4px; }
+.rs-title { flex: 1; min-width: 0; }
 .rs-top-btn {
   display: none;
   flex-shrink: 0;

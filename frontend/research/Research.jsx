@@ -243,9 +243,6 @@ export default function Research() {
               </span>
             )}
           </div>
-          <button className="rs-head-new" onClick={newChat} title="New chat" aria-label="New chat">
-            <NewChatSvg />
-          </button>
           <button className="rs-top-btn" onClick={newChat} aria-label="New chat">
             <NewChatSvg />
           </button>
