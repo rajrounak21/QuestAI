@@ -9,7 +9,9 @@ import { PriceDisclaimer, GuideButton } from "../../src/shared/TravelGuide";
 import { flightsApi, timeAgo } from "./api";
 import { useRouterPrefill } from "../../src/shared/useRouterPrefill";
 import { getToken } from "../../auth/api";
-import "./Flights.css";
+// Styles shared with the hotels and trips pages. Flights.css is gone: it had no
+// rules of its own, every one of them lived in the other two stylesheets too.
+import "../shared/travel.css";
 
 const DEFAULT_FILTERS = { stops: "any", airlines: [], maxPrice: null, sortBy: "price_asc" };
 

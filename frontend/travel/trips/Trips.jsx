@@ -17,6 +17,9 @@ import { getToken } from "../../auth/api";
 import ErrorBoundary from "../../src/shared/ErrorBoundary";
 import { PriceDisclaimer, GuideButton } from "../../src/shared/TravelGuide";
 import "./Trips.css";
+// Styles shared with the flights and hotels pages. Used to be a copy-paste of
+// this same block in all three stylesheets.
+import "../shared/travel.css";
 
 const POLL_MS = 2500;
 const POLL_MAX_TRIES = 200; // ~8 min ceiling, trips run 1-3 min

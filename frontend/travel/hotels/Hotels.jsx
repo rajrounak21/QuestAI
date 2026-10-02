@@ -10,6 +10,9 @@ import { hotelsApi, timeAgo } from "./api";
 import { useRouterPrefill } from "../../src/shared/useRouterPrefill";
 import { getToken } from "../../auth/api";
 import "./Hotels.css";
+// Styles shared with the flights and trips pages. Used to be a copy-paste of
+// this same block in all three stylesheets.
+import "../shared/travel.css";
 
 const DEFAULT_FILTERS = { minRating: "any", amenities: [], maxPrice: null, freeCancellation: false, sortBy: "relevance" };
 
