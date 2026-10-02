@@ -14,7 +14,7 @@ const LABEL_BG = "#0b0e14";
 const CYAN = "#56e1d5";
 
 function tagColor(tag, accent) {
-  if (tag === "LLM") return accent;
+  if (tag === "AI") return accent;
   if (tag === "API" || tag === "2× API") return CYAN;
   if (tag === "MongoDB") return "#56d9a0";
   return MUTED; // rule, logic
@@ -26,23 +26,23 @@ export const FLOWS = {
     title: "Research",
     subtitle: "Deep research LangGraph — boxes are real nodes, arrows are real edges",
     accent: "#5b7cff",
-    stats: ["9 graph nodes", "2 re-run loops", "~8–12 LLM calls"],
+    stats: ["9 graph nodes", "2 re-run loops", "3 decision points"],
     w: 640,
     h: 1520,
     nodes: {
       start: { x: 230, y: 20, w: 180, h: 40, kind: "pill", title: "User query" },
-      session: { x: 220, y: 100, w: 200, h: 100, title: "Session check", tag: "LLM", lines: ["Topic continuity: same →", "continue, else fresh / ask"] },
-      complex: { x: 220, y: 240, w: 200, h: 100, title: "Complexity classifier", tag: "LLM", lines: ["Cheapest sufficient route:", "direct · evidence · full"] },
+      session: { x: 220, y: 100, w: 200, h: 100, title: "Session check", tag: "AI", lines: ["Topic continuity: same →", "continue, else fresh / ask"] },
+      complex: { x: 220, y: 240, w: 200, h: 100, title: "Complexity classifier", tag: "AI", lines: ["Cheapest sufficient route:", "direct · evidence · full"] },
       route: { x: 220, y: 380, w: 200, h: 110, kind: "diamond", title: "Route?" },
-      direct: { x: 20, y: 530, w: 170, h: 100, title: "Direct answer", tag: "LLM", lines: ["1 fast answer ·", "no search, no graph"] },
-      planner: { x: 225, y: 530, w: 190, h: 100, title: "Planner", tag: "LLM", lines: ["4–8 queries: Google,", "Scholar, News"] },
-      evidence: { x: 450, y: 530, w: 170, h: 100, title: "Evidence route", tag: "LLM", lines: ["Synth + validate on", "cached evidence"] },
+      direct: { x: 20, y: 530, w: 170, h: 100, title: "Direct answer", tag: "AI", lines: ["1 fast answer ·", "no search, no graph"] },
+      planner: { x: 225, y: 530, w: 190, h: 100, title: "Planner", tag: "AI", lines: ["4–8 queries: Google,", "Scholar, News"] },
+      evidence: { x: 450, y: 530, w: 170, h: 100, title: "Evidence route", tag: "AI", lines: ["Synth + validate on", "cached evidence"] },
       router: { x: 225, y: 670, w: 190, h: 64, title: "Router", tag: "logic", lines: ["pass-through"] },
       collector: { x: 225, y: 774, w: 190, h: 100, title: "Collector", tag: "API", lines: ["5 parallel workers ·", "raw results"] },
       evaluator: { x: 225, y: 914, w: 190, h: 64, title: "Evaluator", tag: "logic", lines: ["extract evidence"] },
-      gap: { x: 225, y: 1018, w: 190, h: 100, title: "Gap analyzer", tag: "LLM", lines: ["covered / weak /", "missing?"] },
-      synth: { x: 225, y: 1158, w: 190, h: 100, title: "Synthesizer", tag: "LLM", lines: ["summary · findings ·", "comparison · sources"] },
-      validator: { x: 225, y: 1298, w: 190, h: 100, title: "Validator", tag: "LLM", lines: ["each claim vs", "cited evidence"] },
+      gap: { x: 225, y: 1018, w: 190, h: 100, title: "Gap analyzer", tag: "AI", lines: ["covered / weak /", "missing?"] },
+      synth: { x: 225, y: 1158, w: 190, h: 100, title: "Synthesizer", tag: "AI", lines: ["summary · findings ·", "comparison · sources"] },
+      validator: { x: 225, y: 1298, w: 190, h: 100, title: "Validator", tag: "AI", lines: ["each claim vs", "cited evidence"] },
       save: { x: 170, y: 1438, w: 300, h: 44, kind: "pill", dashed: true, title: "Format + save session", tag: "MongoDB" },
     },
     edges: [
@@ -68,14 +68,14 @@ export const FLOWS = {
   shopping: {
     id: "shopping",
     title: "Shopping",
-    subtitle: "Product comparison graph — fast, deterministic, zero LLM calls",
+    subtitle: "Product comparison graph — fast, deterministic, nothing for a model to do",
     accent: "#f3c96a",
-    stats: ["3 graph nodes", "0 LLM calls", "2 live APIs"],
+    stats: ["3 graph nodes", "no model in the loop", "2 live APIs"],
     w: 640,
     h: 700,
     nodes: {
       start: { x: 230, y: 20, w: 180, h: 40, kind: "pill", title: "Query + country" },
-      extract: { x: 220, y: 100, w: 200, h: 100, title: "Extract params", tag: "rule", lines: ["deterministic ·", "0 LLM calls"] },
+      extract: { x: 220, y: 100, w: 200, h: 100, title: "Extract params", tag: "rule", lines: ["deterministic ·", "no model needed"] },
       validate: { x: 220, y: 240, w: 200, h: 64, title: "Validate", tag: "rule", lines: ["empty / too short?"] },
       valid: { x: 220, y: 344, w: 200, h: 100, kind: "diamond", title: "Valid?" },
       askUser: { x: 30, y: 484, w: 170, h: 100, dashed: true, title: "Agent asks", lines: ["query too short", "run stops"] },
@@ -107,20 +107,20 @@ export const FLOWS = {
       // route_after_input always returns resume_vision_parser unless the graph
       // already errored or the request had nothing usable, which ends the run.
       // input_analyzer raises this one when there is no query AND no resume.
-      errIn: { x: 20, y: 100, w: 170, h: 100, kind: "diamond", dashed: true, title: "Empty request?" },
-      parse: { x: 210, y: 180, w: 220, h: 110, title: "Resume parser", tag: "LLM", lines: ["bytes → parse · none →", "load stored profile"] },
-      query: { x: 210, y: 330, w: 220, h: 100, title: "Query analyzer", tag: "rule", lines: ["role · location ·", "work mode (typo → LLM)"] },
+      errIn: { x: 20, y: 100, w: 170, h: 100, kind: "diamond", dashed: true, title: "No resume, no query?" },
+      parse: { x: 210, y: 180, w: 220, h: 110, title: "Resume parser", tag: "AI", lines: ["bytes → parse · none →", "load stored profile"] },
+      query: { x: 210, y: 330, w: 220, h: 100, title: "Query analyzer", tag: "rule", lines: ["role · location ·", "work mode (typo → AI)"] },
       build: { x: 210, y: 470, w: 220, h: 100, title: "Profile builder", tag: "rule", lines: ["merge resume + query", "into one profile"] },
       valid: { x: 210, y: 610, w: 220, h: 100, kind: "diamond", title: "Profile ok?" },
       ask: { x: 20, y: 750, w: 170, h: 100, dashed: true, title: "Agent asks", lines: ["no role, or no place", "run stops"] },
-      plan: { x: 210, y: 750, w: 220, h: 100, title: "Search planner", tag: "rule", lines: ["roles × locations =", "≤ 4 requests, 0 LLM"] },
+      plan: { x: 210, y: 750, w: 220, h: 100, title: "Search planner", tag: "rule", lines: ["roles × locations =", "≤ 4 requests, no model"] },
       search: { x: 210, y: 890, w: 220, h: 100, title: "Google Jobs", tag: "API", lines: ["SerpApi ·", "normalise + dedupe"] },
       match: { x: 210, y: 1030, w: 220, h: 100, title: "Match + rank", tag: "rule", lines: ["skill overlap →", "freshest, 0% honest"] },
       save: { x: 160, y: 1160, w: 320, h: 40, kind: "pill", dashed: true, title: "Session + search saved", tag: "MongoDB" },
     },
     edges: [
       { from: "start", to: "errIn" },
-      { from: "errIn", fromSide: "left", to: "save", label: "agent asks", lx: 78, ly: 700 },
+      { from: "errIn", fromSide: "left", to: "save", label: "asks for resume", lx: 62, ly: 700 },
       { from: "errIn", to: "parse" },
       { from: "parse", to: "query" },
       { from: "query", to: "build" },
@@ -137,7 +137,7 @@ export const FLOWS = {
     title: "Travel",
     subtitle: "Flights, hotels + trip planner — three graphs verified against backend/agents/travel",
     accent: "#56e1d5",
-    stats: ["3 graphs", "14 graph nodes", "5 LLM calls"],
+    stats: ["3 graphs", "14 graph nodes", "3 decision points"],
     sections: [
       {
         sectionTitle: "Flight search",
@@ -145,7 +145,7 @@ export const FLOWS = {
         h: 700,
         nodes: {
           start: { x: 230, y: 20, w: 180, h: 40, kind: "pill", title: "Delhi → Dubai + date" },
-          extract: { x: 220, y: 100, w: 200, h: 100, title: "Extract params", tag: "LLM", lines: ["origin · destination ·", "dates · cabin · pax"] },
+          extract: { x: 220, y: 100, w: 200, h: 100, title: "Extract params", tag: "AI", lines: ["origin · destination ·", "dates · cabin · pax"] },
           validate: { x: 220, y: 240, w: 200, h: 64, title: "Validate", tag: "rule", lines: ["origin + destination + date?"] },
           valid: { x: 220, y: 344, w: 200, h: 100, kind: "diamond", title: "Valid?" },
           askUser: { x: 30, y: 484, w: 170, h: 100, dashed: true, title: "Agent asks", lines: ["needs route", "and a date"] },
@@ -167,7 +167,7 @@ export const FLOWS = {
         h: 700,
         nodes: {
           start: { x: 230, y: 20, w: 180, h: 40, kind: "pill", title: "City + check-in/out" },
-          extract: { x: 220, y: 100, w: 200, h: 100, title: "Extract params", tag: "LLM", lines: ["location · check-in/out ·", "guests · rooms"] },
+          extract: { x: 220, y: 100, w: 200, h: 100, title: "Extract params", tag: "AI", lines: ["location · check-in/out ·", "guests · rooms"] },
           validate: { x: 220, y: 240, w: 200, h: 64, title: "Validate", tag: "rule", lines: ["location + dates?"] },
           valid: { x: 220, y: 344, w: 200, h: 100, kind: "diamond", title: "Valid?" },
           askUser: { x: 30, y: 484, w: 170, h: 100, dashed: true, title: "Agent asks", lines: ["needs a place", "and dates"] },
@@ -189,19 +189,19 @@ export const FLOWS = {
         h: 1790,
         nodes: {
           start: { x: 230, y: 20, w: 180, h: 40, kind: "pill", title: "First msg / revision" },
-          extract: { x: 220, y: 100, w: 200, h: 100, title: "Extract params", tag: "LLM", lines: ["params + intent:", "new trip or revision"] },
+          extract: { x: 220, y: 100, w: 200, h: 100, title: "Extract params", tag: "AI", lines: ["params + intent:", "new trip or revision"] },
           pok: { x: 220, y: 240, w: 200, h: 100, kind: "diamond", title: "Params ok?" },
-          validate: { x: 220, y: 380, w: 200, h: 100, title: "Validate", tag: "LLM", lines: ["clarifying questions", "if details missing"] },
+          validate: { x: 220, y: 380, w: 200, h: 100, title: "Validate", tag: "AI", lines: ["clarifying questions", "if details missing"] },
           qd: { x: 220, y: 520, w: 200, h: 100, kind: "diamond", title: "Questions?" },
           merge: { x: 225, y: 660, w: 190, h: 64, title: "Merge answers", tag: "logic", lines: ["attach user answers"] },
-          impact: { x: 225, y: 764, w: 190, h: 100, title: "Detect impact", tag: "LLM", lines: ["which agents affected?", "flights/hotels/research"] },
+          impact: { x: 225, y: 764, w: 190, h: 100, title: "Detect impact", tag: "AI", lines: ["which agents affected?", "flights/hotels/research"] },
           load: { x: 225, y: 904, w: 190, h: 64, title: "Load session", tag: "DB", lines: ["create / resume trip"] },
           update: { x: 220, y: 1008, w: 200, h: 100, title: "Update state", tag: "logic", lines: ["apply changes ·", "recompute hashes"] },
           need: { x: 220, y: 1148, w: 200, h: 100, kind: "diamond", title: "Agents needed?" },
           dispatch: { x: 225, y: 1288, w: 190, h: 100, title: "Dispatch agents", tag: "logic", lines: ["runs affected sub-graphs", "see 3 calls below"] },
           dFlights: { x: 30, y: 1428, w: 150, h: 100, title: "Flights search", tag: "API", lines: ["full flight graph ·", "skip if hash same"] },
           dHotels: { x: 190, y: 1428, w: 150, h: 100, title: "Hotels search", tag: "API", lines: ["full hotel graph ·", "skip if hash same"] },
-          dResearch: { x: 350, y: 1428, w: 150, h: 100, title: "Dest research", tag: "LLM", lines: ["places + itinerary", "skip if hash same"] },
+          dResearch: { x: 350, y: 1428, w: 150, h: 100, title: "Dest research", tag: "AI", lines: ["places + itinerary", "skip if hash same"] },
           synth: { x: 225, y: 1568, w: 190, h: 100, title: "Synthesize", tag: "logic", lines: ["itinerary + budget ·", "cheapest / best picks"] },
           save: { x: 170, y: 1708, w: 300, h: 44, kind: "pill", dashed: true, title: "Save trip", tag: "MongoDB" },
         },
