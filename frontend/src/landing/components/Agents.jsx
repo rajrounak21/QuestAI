@@ -1,9 +1,13 @@
 import Reveal from "./Reveal.jsx";
 import { AGENTS } from "../data.jsx";
 
-// Research + Shopping open dedicated full-page graph flows.
-// Travel/Jobs keep scrolling to the CTA for now.
-const FLOW_LINKS = { research: "#/flow/research", shopping: "#/flow/shopping", travel: "#/flow/travel" };
+// Every agent opens a dedicated full-page graph flow.
+const FLOW_LINKS = {
+  research: "#/flow/research",
+  shopping: "#/flow/shopping",
+  travel: "#/flow/travel",
+  jobs: "#/flow/jobs",
+};
 
 export default function Agents() {
   return (

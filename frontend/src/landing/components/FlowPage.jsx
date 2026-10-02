@@ -5,6 +5,7 @@ const TITLES = {
   research: "Research flow — QuestAI",
   shopping: "Shopping flow — QuestAI",
   travel: "Travel flow — QuestAI",
+  jobs: "Jobs flow — QuestAI",
 };
 
 // Zoom is a multiplier over the fitted scale. 1x = whole graph visible,

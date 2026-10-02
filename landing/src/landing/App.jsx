@@ -18,8 +18,9 @@ function routeFromHash() {
   if (h.startsWith("#/about")) return "about";
   if (h.startsWith("#/flow/research")) return "flow-research";
   if (h.startsWith("#/flow/shopping")) return "flow-shopping";
-  if (h.startsWith("#/flow/travel")) return "flow-travel";
-  return "home";
+if (h.startsWith("#/flow/travel")) return "flow-travel";
+    if (h.startsWith("#/flow/jobs")) return "flow-jobs";
+    return "home";
 }
 
 const TITLES = {
@@ -29,8 +30,9 @@ const TITLES = {
   about: "About Us — QuestAI",
   "flow-research": "Research flow — QuestAI",
   "flow-shopping": "Shopping flow — QuestAI",
-  "flow-travel": "Travel flow — QuestAI",
-};
+"flow-travel": "Travel flow — QuestAI",
+    "flow-jobs": "Jobs flow — QuestAI",
+  };
 
 export default function App() {
   const [route, setRoute] = useState(routeFromHash);
@@ -69,6 +71,7 @@ export default function App() {
     if (route === "flow-research") return <div className="landing-scope"><FlowPage flowId="research" /></div>;
     if (route === "flow-shopping") return <div className="landing-scope"><FlowPage flowId="shopping" /></div>;
     if (route === "flow-travel") return <div className="landing-scope"><FlowPage flowId="travel" /></div>;
+  if (route === "flow-jobs") return <div className="landing-scope"><FlowPage flowId="jobs" /></div>;
     return <div className="landing-scope"><LegalPage doc={route} /></div>;
   }
 
