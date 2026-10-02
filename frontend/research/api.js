@@ -47,7 +47,11 @@ export const researchApi = {
 
 export function timeAgo(iso) {
   if (!iso) return "";
-  const t = new Date(iso).getTime();
+  let str = String(iso);
+  if (!str.endsWith("Z") && !str.includes("+") && !str.includes("Z")) {
+    str += "Z";
+  }
+  const t = new Date(str).getTime();
   if (Number.isNaN(t)) return "";
   const s = Math.max(1, Math.floor((Date.now() - t) / 1000));
   if (s < 60) return "just now";
@@ -57,5 +61,5 @@ export function timeAgo(iso) {
   if (h < 24) return `${h}h ago`;
   const d = Math.floor(h / 24);
   if (d < 7) return `${d}d ago`;
-  return new Date(iso).toLocaleDateString();
+  return new Date(str).toLocaleDateString();
 }

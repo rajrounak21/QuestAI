@@ -1,22 +1,50 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { authFetch, clearAuth, getToken } from "./api";
-import { BellIcon, BriefcaseIcon, MenuIcon, SendIcon, SparkleIcon } from "./components/icons";
+import { authFetch, clearAuth, getToken, routeIntent, askAssistant } from "./api";
+import { BellIcon, BriefcaseIcon, MenuIcon, SendIcon } from "./components/icons";
+import AgentSelect from "./components/AgentSelect";
+import { AGENT_BY_ID, AGENT_OPTIONS, DEFAULT_AGENT_ID } from "../src/shared/agents";
 import { LogoMark, ThemeToggle } from "./components/ui";
 
 const NAV = ["Home", "Research", "Travel", "Shopping", "Jobs"];
-const AGENTS = ["Auto", "Research", "Travel", "Shopping", "Jobs"];
+const NAV_PATH = {
+  Research: "/research",
+  Shopping: "/shopping",
+  // The header keeps one "Travel" entry pointing at the trip planner; the
+  // dropdown is where Flights and Hotels are picked individually.
+  Travel: "/trips",
+  Jobs: "/jobs",
+};
+// Agent list lives in src/shared/agents.js so the dropdown, submit() routing
+// and the suggestion cards all read from one place.
+
+// Recent-activity cards open their saved session. A lookup beats a nested
+// ternary here: Jobs was silently missing from the old chain, so job cards
+// opened /research/<id> instead of /jobs/<id>.
+const ACTIVITY_PATH = {
+  Research: "/research",
+  Shopping: "/shopping",
+  Flights: "/flights",
+  Hotels: "/hotels",
+  Trips: "/trips",
+  Jobs: "/jobs",
+};
 
 const SUGGESTIONS = [
-  { agent: "Research", text: "Compare RAG evaluation frameworks" },
-  { agent: "Travel", text: "Find flights from Delhi to Dubai" },
-  { agent: "Shopping", text: "Compare phones under ₹30,000" },
-  { agent: "Jobs", text: "Find AI internships in India" },
+  { agent: "research", text: "Compare RAG evaluation frameworks" },
+  { agent: "flights", text: "Find flights from Delhi to Dubai" },
+  { agent: "hotels", text: "Find hotels in Bali for 5 nights" },
+  { agent: "shopping", text: "Compare phones under ₹30,000" },
+  { agent: "jobs", text: "Find AI internships in India" },
 ];
 
 function timeAgo(iso) {
   if (!iso) return "";
-  const t = new Date(iso).getTime();
+  let str = String(iso);
+  if (!str.endsWith("Z") && !str.includes("+") && !str.includes("Z")) {
+    str += "Z";
+  }
+  const t = new Date(str).getTime();
   if (Number.isNaN(t)) return "";
   const s = Math.max(1, Math.floor((Date.now() - t) / 1000));
   if (s < 60) return "just now";
@@ -26,21 +54,64 @@ function timeAgo(iso) {
   if (h < 24) return `${h}h ago`;
   const d = Math.floor(h / 24);
   if (d < 7) return `${d}d ago`;
-  return new Date(iso).toLocaleDateString();
+  return new Date(str).toLocaleDateString();
 }
 
 const AGENT_ROWS = [
-  { name: "Research", desc: "Deep research, evidence and structured answers" },
-  { name: "Travel", desc: "Flights, hotels and trip plans" },
-  { name: "Shopping", desc: "Compare products and prices" },
-  { name: "Jobs", desc: "Find and monitor opportunities" },
+  { name: "Research", desc: "Deep research, evidence and structured answers", path: "/research" },
+  { name: "Shopping", desc: "Compare products and prices", path: "/shopping" },
+  { name: "Jobs", desc: "Find and monitor opportunities", path: "/jobs" },
+  { name: "Flights", desc: "Fare search across dates and airlines", path: "/flights" },
+  { name: "Hotels", desc: "Stays, rooms and nightly rates", path: "/hotels" },
+  { name: "Trips", desc: "Full itinerary: flights, hotels, plans", path: "/trips" },
 ];
 
+// Rotating hero lines: 4 time slots x 6 messages. Picked deterministically
+// by day-of-year — stable all day, fresh every morning. No backend needed.
+const GREETINGS = {
+  morning: [
+    { greet: "Good morning", sub: "What are we hunting today — flights, hotels or deep research?" },
+    { greet: "Morning", sub: "Fresh day, fast answers. Where should we start?" },
+    { greet: "Good morning", sub: "Coffee's on you, answers are on me — what's first?" },
+    { greet: "Rise and shine", sub: "What are you looking for this morning?" },
+    { greet: "Good morning", sub: "Big plans today? Point me at one and let's go." },
+    { greet: "Morning", sub: "Your agents are warmed up — give them something to do." },
+  ],
+  afternoon: [
+    { greet: "Good afternoon", sub: "What can I help you with today?" },
+    { greet: "Good afternoon", sub: "Midday momentum — what are we solving next?" },
+    { greet: "Hey there", sub: "Afternoon slump? Hand me a task and keep moving." },
+    { greet: "Good afternoon", sub: "Quick ask or deep dive — I'm ready either way." },
+    { greet: "Welcome back", sub: "Anything pending from this morning to finish?" },
+    { greet: "Good afternoon", sub: "Trips, research, shopping — pick your lane." },
+  ],
+  evening: [
+    { greet: "Good evening", sub: "Winding down or gearing up — what do you need?" },
+    { greet: "Good evening", sub: "One good answer before dinner — what's the question?" },
+    { greet: "Evening", sub: "Planning something fun tonight? Start here." },
+    { greet: "Good evening", sub: "What are you looking for this evening?" },
+    { greet: "Welcome back", sub: "Let's close out the day strong — what's left?" },
+    { greet: "Good evening", sub: "Research, travel, shopping — all yours till late." },
+  ],
+  night: [
+    { greet: "Burning midnight oil", sub: "Quiet hours, fast answers — what do you need?" },
+    { greet: "Up late", sub: "No judgment — what's on your mind?" },
+    { greet: "Good night", sub: "One last thing before you log off?" },
+    { greet: "Night owl mode", sub: "Tomorrow's plans start tonight. Shoot." },
+    { greet: "Still awake", sub: "Quick one or a rabbit hole — your call." },
+    { greet: "Good night", sub: "Dream trips count too — where to?" },
+  ],
+};
+
 function greeting() {
-  const h = new Date().getHours();
-  if (h < 12) return "Good morning";
-  if (h < 17) return "Good afternoon";
-  return "Good evening";
+  const now = new Date();
+  const h = now.getHours();
+  const slot = h >= 5 && h < 12 ? "morning" : h >= 12 && h < 17 ? "afternoon" : h >= 17 && h < 22 ? "evening" : "night";
+  const list = GREETINGS[slot];
+  // Day-of-year keeps it stable all day, fresh every morning.
+  const start = new Date(now.getFullYear(), 0, 0);
+  const day = Math.floor((now - start) / 86400000);
+  return list[day % list.length];
 }
 
 function maskEmail(email = "") {
@@ -51,15 +122,20 @@ function maskEmail(email = "") {
 
 export default function Home() {
   const navigate = useNavigate();
+  const inputRef = useRef(null);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [netDown, setNetDown] = useState(false);
   const [active, setActive] = useState("Home");
   const [menu, setMenu] = useState(false);
   const [profile, setProfile] = useState(false);
-  const [agent, setAgent] = useState("Auto");
+  const [agent, setAgent] = useState(DEFAULT_AGENT_ID);
   const [query, setQuery] = useState("");
-  const [routing, setRouting] = useState(null); // { steps:[], done, label }
+  // Real universal-layer state. `thinking` while the LLM decides, `reply` for
+  // the Assistant's inline answer (it has no page to navigate to).
+  const [thinking, setThinking] = useState(false);
+  const [reply, setReply] = useState(null); // { q, text }
+  const [routeError, setRouteError] = useState(null);
   const [activity, setActivity] = useState([]);
 
   useEffect(() => {
@@ -91,11 +167,62 @@ export default function Home() {
         const data = await res.json();
         setUser(data.user);
         setLoading(false);
-        authFetch("/api/research/history?limit=5")
-          .then(async (h) => {
-            if (!h || h.unauthorized || h.networkError) return;
-            const hd = await h.json().catch(() => ({}));
-            setActivity(hd.items || []);
+        // Jobs is in this list too — omitting it was why job searches never
+        // appeared in Recent activity.
+        Promise.all([
+          authFetch("/api/research/history?limit=5").then((h) => h && !h.unauthorized && !h.networkError ? h.json().catch(() => ({})) : {}),
+          authFetch("/api/shopping/history?limit=5").then((h) => h && !h.unauthorized && !h.networkError ? h.json().catch(() => ({})) : {}),
+          authFetch("/api/flights/history?limit=5").then((h) => h && !h.unauthorized && !h.networkError ? h.json().catch(() => ({})) : {}),
+          authFetch("/api/hotels/history?limit=5").then((h) => h && !h.unauthorized && !h.networkError ? h.json().catch(() => ({})) : {}),
+          authFetch("/api/trips/history?limit=5").then((h) => h && !h.unauthorized && !h.networkError ? h.json().catch(() => ({})) : {}),
+          authFetch("/api/jobs/history?limit=5").then((h) => h && !h.unauthorized && !h.networkError ? h.json().catch(() => ({})) : {}),
+        ])
+          .then(([rd, sd, fd, hd, td, jd]) => {
+            const rItems = (rd.items || []).map((a) => ({ ...a, agent: "Research" }));
+            const sItems = (sd.items || []).map((a) => ({
+              session_id: a.session_id,
+              query: a.title || a.query,
+              updated_at: a.last_search_at || a.updated_at,
+              status: "completed",
+              agent: "Shopping",
+            }));
+            const fItems = (fd.items || []).map((a) => ({
+              session_id: a.session_id,
+              query: a.title || a.query,
+              updated_at: a.last_search_at || a.updated_at,
+              status: "completed",
+              agent: "Flights",
+            }));
+            const hItems = (hd.items || []).map((a) => ({
+              session_id: a.session_id,
+              query: a.title || a.query,
+              updated_at: a.last_search_at || a.updated_at,
+              status: "completed",
+              agent: "Hotels",
+            }));
+            const tItems = (td.items || []).map((a) => ({
+              session_id: a.session_id,
+              query: a.title || a.query,
+              updated_at: a.updated_at,
+              status: a.status === "ready" ? "completed" : a.status,
+              agent: "Trips",
+            }));
+            const jItems = (jd.items || []).map((a) => ({
+              session_id: a.session_id,
+              query: a.title || a.query,
+              updated_at: a.last_search_at || a.updated_at,
+              status: "completed",
+              agent: "Jobs",
+            }));
+            // Most recent first across ALL agents — previously slice(0, 5)
+            // on research-first concatenation always buried travel items.
+            const timeOf = (a) => {
+              const t = new Date(a.updated_at || 0).getTime();
+              return Number.isNaN(t) ? 0 : t;
+            };
+            const all = [...rItems, ...sItems, ...fItems, ...hItems, ...tItems, ...jItems];
+            all.sort((a, b) => timeOf(b) - timeOf(a));
+            setActivity(all.slice(0, 6));
           })
           .catch(() => {});
       })
@@ -119,28 +246,67 @@ export default function Home() {
   const submit = (e) => {
     e.preventDefault();
     const q = query.trim();
-    if (!q || routing) return;
-    if (agent === "Research") {
-      navigate(`/research?q=${encodeURIComponent(q)}`);
+    if (!q || thinking) return;
+    // A chosen agent just goes to its own workspace. No keyword sniffing here:
+    // Flights / Hotels / Trips used to be lumped into one "Travel" pill that
+    // guessed between them, so picking Travel for a hotel search could land on
+    // a full itinerary plan instead.
+    const chosen = AGENT_BY_ID[agent];
+    if (chosen?.path) {
+      navigate(`${chosen.path}?q=${encodeURIComponent(q)}`);
       return;
     }
-    const label = agent === "Auto" ? "Auto" : agent;
-    const steps =
-      agent === "Auto"
-        ? ["Understanding request", "Choosing best agent", "Universal router connects here soon"]
-        : [`Understanding request`, `Routing to ${label}`, `${label} workspace connects here soon`];
-    setRouting({ q, steps, shown: 0, done: false });
-  };
 
-  useEffect(() => {
-    if (!routing || routing.done) return;
-    if (routing.shown >= routing.steps.length) {
-      const t = setTimeout(() => setRouting((r) => ({ ...r, done: true })), 600);
-      return () => clearTimeout(t);
-    }
-    const t = setTimeout(() => setRouting((r) => ({ ...r, shown: r.shown + 1 })), 900);
-    return () => clearTimeout(t);
-  }, [routing]);
+    // ---- Auto: the universal layer decides -------------------------------
+    // The LLM picks ONE specialist and pre-extracts its form fields. It does
+    // not run anything: we navigate, the destination pre-fills its form, and
+    // the user presses Search themselves. A greeting gets an inline reply
+    // instead, because the Assistant has no page.
+    setThinking(true);
+    setRouteError(null);
+    setReply(null);
+    routeIntent(q)
+      .then((d) => {
+        if (d.unauthorized) {
+          navigate("/login", { replace: true });
+          return;
+        }
+        if (d.networkError) throw new Error("Cannot reach the server. Is the backend running?");
+        if (d.agent === "assistant") {
+          return askAssistant(q).then((a) => {
+            if (a.unauthorized) {
+              navigate("/login", { replace: true });
+              return;
+            }
+            if (a.networkError) throw new Error("Cannot reach the server. Is the backend running?");
+            setReply({ q, text: a.reply || "I'm not sure how to answer that right now." });
+          });
+        }
+        // Surface the real reason instead of a generic message: an unknown
+        // agent, a missing path, or a shape change all land here.
+        if (!d.path) {
+          throw new Error(
+            d.agent
+              ? `The router picked "${d.agent}" but gave no destination for it.`
+              : "The router did not choose an agent. Please try rephrasing."
+          );
+        }
+        // `state` (not the URL) carries the pre-extracted fields. It dies with
+        // the navigation, so a refresh falls back to the page's own parser
+        // instead of re-applying stale values.
+        navigate(`${d.path}?q=${encodeURIComponent(q)}`, {
+          state: { prefill: { agent: d.agent, query: q, fields: d.fields || {} } },
+        });
+      })
+      .catch((err) => {
+        setRouteError(
+          err.code === "unauthorized"
+            ? "Session expired. Please sign in again."
+            : err.message || "Could not reach the assistant."
+        );
+      })
+      .finally(() => setThinking(false));
+  };
 
   if (loading) {
     return (
@@ -176,8 +342,20 @@ export default function Home() {
           </Link>
           <nav className={`dash-nav${menu ? " open" : ""}`}>
             {NAV.map((n) => (
-              <button key={n} className={`dash-navlink${active === n ? " active" : ""}`}
-                onClick={() => { setActive(n); setMenu(false); }}>
+              <button
+                key={n}
+                className={`dash-navlink${active === n ? " active" : ""}`}
+                onClick={() => {
+                  setMenu(false);
+                  // Same lookup as submit(): one source of truth for paths.
+                  const target = NAV_PATH[n];
+                  if (target) {
+                    navigate(target);
+                    return;
+                  }
+                  setActive(n);
+                }}
+              >
                 {n}
               </button>
             ))}
@@ -210,47 +388,97 @@ export default function Home() {
 
       <main className="dash-main dash-wide">
         <section className="dash-hero">
-          <h1>{greeting()}, {firstName}</h1>
-          <p className="auth-sub">What can I help you with today?</p>
+          <h1>{greeting().greet}, {firstName}</h1>
+          <p className="auth-sub">{greeting().sub}</p>
           <form onSubmit={submit} className="dash-ask">
+            {/* Agent lives inside the input bar. Custom, not a native <select>:
+                the OS paints that popup itself and it ignores the dark theme. */}
+            <AgentSelect
+              value={agent}
+              options={AGENT_OPTIONS}
+              onChange={setAgent}
+              disabled={thinking}
+            />
             <input
+              ref={inputRef}
               placeholder="Ask anything..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              disabled={thinking}
             />
-            <button type="submit" aria-label="Send"><SendIcon /></button>
+            <button type="submit" aria-label="Send" disabled={thinking || !query.trim()}>
+              {thinking ? <span className="spinner-small" /> : <SendIcon />}
+            </button>
           </form>
           <p className="dash-hint">Ask anything. I&apos;ll figure out which AI agent can help.</p>
-          <div className="dash-pills">
-            <span className="dash-pills-label">What do you want to do?</span>
-            <div className="dash-pills-row">
-              {AGENTS.map((a) => (
-                <button key={a} className={`dash-pill${agent === a ? " active" : ""}`}
-                  onClick={() => {
-                    if (a === "Research") {
-                      navigate("/research");
-                      return;
-                    }
-                    setAgent(a);
-                  }}>
-                  {a === "Auto" ? (<><SparkleIcon /> Auto</>) : a}
+
+          {/* The conversation sits directly under the input, not at the bottom
+              of the page. It is the answer to what the user just typed, so it
+              belongs next to the box they typed it in. */}
+          {(thinking || reply || routeError) && (
+            <div className="dash-chat" role="status" aria-live="polite">
+              <div className="dash-chat-row dash-chat-you">
+                <span className="dash-chat-bubble">{reply ? reply.q : query.trim()}</span>
+              </div>
+
+              {thinking && (
+                <div className="dash-chat-row">
+                  <span className="dash-chat-bubble dash-chat-bubble-bot">
+                    <span className="dash-chat-dots">
+                      <i /><i /><i />
+                    </span>
+                  </span>
+                </div>
+              )}
+
+              {routeError && (
+                <div className="dash-chat-row">
+                  <span className="dash-chat-bubble dash-chat-bubble-bot dash-chat-bubble-err">
+                    {routeError}
+                  </span>
+                </div>
+              )}
+
+              {reply && (
+                <div className="dash-chat-row">
+                  <span className="dash-chat-bubble dash-chat-bubble-bot">{reply.text}</span>
+                </div>
+              )}
+
+              {!thinking && (
+                <button
+                  type="button"
+                  className="dash-chat-close"
+                  onClick={() => { setReply(null); setRouteError(null); }}
+                  aria-label="Dismiss reply"
+                  title="Dismiss"
+                >
+                  ×
                 </button>
-              ))}
+              )}
             </div>
-          </div>
+          )}
+
+          {/* No pill row: the agent is the dropdown inside the input bar. */}
           <div className="dash-suggest">
             <p className="dash-sect-label">Try asking</p>
             <div className="dash-suggest-grid">
               {SUGGESTIONS.map((s) => (
-                <button key={s.text} className="dash-suggest-card"
+                <button
+                  key={s.text}
+                  type="button"
+                  className="dash-suggest-card"
                   onClick={() => {
-                    if (s.agent === "Research") {
-                      navigate(`/research?q=${encodeURIComponent(s.text)}`);
-                      return;
-                    }
-                    setQuery(s.text); setAgent(s.agent);
-                  }}>
-                  <strong>{s.agent}</strong>
+                    // Prefill only. This must never run the agent — the user
+                    // still has to press Send. type="button" keeps it that way
+                    // even if this markup ever ends up inside a <form>.
+                    setQuery(s.text);
+                    setAgent(s.agent);
+                    if (inputRef.current) inputRef.current.focus();
+                  }}
+                >
+                  {/* s.agent is an id now ("flights"), so show the label. */}
+                  <strong>{AGENT_BY_ID[s.agent]?.label || s.agent}</strong>
                   <span>&ldquo;{s.text}&rdquo;</span>
                 </button>
               ))}
@@ -258,23 +486,8 @@ export default function Home() {
           </div>
         </section>
 
-        {routing && (
-          <section className="dash-route">
-            <p className="dash-sect-label">Your request</p>
-            <p className="dash-route-q">&ldquo;{routing.q}&rdquo;</p>
-            <div className="dash-steps">
-              {routing.steps.slice(0, routing.shown).map((s, i) => (
-                <p key={i} className={i === 1 ? "dash-core" : ""}>
-                  {i === 1 ? (<><SparkleIcon size={13} /> </>) : "↓ "}{s}
-                </p>
-              ))}
-            </div>
-            {routing.done && (
-              <button className="auth-link" onClick={() => setRouting(null)}>Dismiss</button>
-            )}
-          </section>
-        )}
-
+        {/* Assistant reply and the real routing state. Replaces the old fake
+            "connects here soon" step animation. */}
         <section>
           <p className="dash-sect-label">Recent activity</p>
           <div className="dash-activity">
@@ -289,12 +502,15 @@ export default function Home() {
               </div>
             )}
             {activity.map((a) => (
-              <div className="dash-act-card" key={a.session_id}>
-                <strong>Research</strong>
+              <div className="dash-act-card" key={`${a.agent || "Research"}-${a.session_id}`}>
+                <strong>{a.agent || "Research"}</strong>
                 <span className="dash-act-title">{a.query}</span>
                 <div className="dash-act-foot">
-                  <span>{a.status === "running" ? "researching…" : timeAgo(a.updated_at)}</span>
-                  <button className="auth-link" onClick={() => navigate(`/research/${a.session_id}`)}>Open →</button>
+                  <span>{a.status === "running" ? "working…" : a.status === "awaiting_input" ? "input needed" : timeAgo(a.updated_at)}</span>
+                  <button
+                    className="auth-link"
+                    onClick={() => navigate(`${ACTIVITY_PATH[a.agent] || "/research"}/${a.session_id}`)}
+                  >Open →</button>
                 </div>
               </div>
             ))}
@@ -311,11 +527,7 @@ export default function Home() {
                   <strong>{a.name}</strong>
                   <span>{a.desc}</span>
                 </div>
-                {a.name === "Research" ? (
-                  <button className="auth-link" onClick={() => navigate("/research")}>Explore →</button>
-                ) : (
-                  <button className="auth-link">Explore →</button>
-                )}
+                <button className="auth-link" onClick={() => navigate(a.path)}>Explore →</button>
               </div>
             ))}
           </div>
@@ -323,19 +535,15 @@ export default function Home() {
 
         <section>
           <p className="dash-sect-label">Job alerts</p>
-          <div className="dash-alert">
-            <div>
-              <strong><BriefcaseIcon size={15} /> AI Engineer Intern</strong>
-              <span>India · Daily · 10:45 AM</span>
-            </div>
-            <div className="dash-alert-row">
-              <span>Last check · 4 new jobs</span>
-              <button className="auth-link">View Alert</button>
-            </div>
+          <p className="dash-sect-sub">Get daily or weekly alerts for roles and locations you pick.</p>
+          <div style={{ display: "flex", gap: ".6rem", flexWrap: "wrap" }}>
+            <button className="btn-google" style={{ maxWidth: 220, height: 44 }} onClick={() => navigate("/jobs")}>
+              <BriefcaseIcon size={15} /> Browse jobs
+            </button>
+            <button className="auth-link" style={{ alignSelf: "center" }} onClick={() => navigate("/jobs")}>
+              Create job alert →
+            </button>
           </div>
-          <button className="btn-google" style={{ maxWidth: 220, height: 44 }}>
-            + Create job alert
-          </button>
         </section>
       </main>
     </div>

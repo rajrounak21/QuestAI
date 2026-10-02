@@ -55,6 +55,23 @@ export function SparkleIcon({ size = 14, ...props }) {
   );
 }
 
+export function ChevronDownIcon({ size = 14, ...props }) {
+  return base({
+    size,
+    ...props,
+    children: <path d="M6 9l6 6 6-6" />,
+  });
+}
+
+export function CheckIcon({ size = 14, ...props }) {
+  return base({
+    size,
+    strokeWidth: 2.5,
+    ...props,
+    children: <path d="M20 6L9 17l-5-5" />,
+  });
+}
+
 export function BriefcaseIcon(props) {
   return base({
     ...props,

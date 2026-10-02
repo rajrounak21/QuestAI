@@ -1,0 +1,153 @@
+/* Shared travel guide + disclaimer. Uses app theme vars so it blends
+   into Flights / Hotels / Trips without per-page styles. */
+
+.tg-disclaimer {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 9px 12px;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--muted);
+  background: var(--bg1);
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+}
+
+.tg-disclaimer svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--accent);
+}
+
+.tg-disclaimer.compact {
+  margin: 12px 0 0;
+  font-size: 0.76rem;
+}
+
+.tg-disclaimer strong {
+  color: var(--text);
+}
+
+.tg-guide {
+  margin: 4px 0 16px;
+  background: var(--bg1);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.tg-guide-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+}
+
+.tg-guide-toggle:hover {
+  background: var(--soft);
+}
+
+.tg-guide-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 0.86rem;
+  flex: 1;
+}
+
+.tg-guide-title svg {
+  color: var(--accent);
+}
+
+.tg-guide-hint {
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.tg-chevron {
+  color: var(--muted);
+  transition: transform 0.2s ease;
+}
+
+.tg-chevron.open {
+  transform: rotate(180deg);
+}
+
+.tg-steps {
+  list-style: none;
+  margin: 0;
+  padding: 2px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tg-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.tg-step-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  background: var(--soft);
+  border: 1px solid var(--line);
+  color: var(--accent);
+}
+
+/* Header guide modal (chatbot-UI pattern). Self-contained positioning
+   so it works on every page regardless of local modal styles. */
+.tg-modal-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.tg-modal {
+  width: min(480px, 94vw);
+  max-height: 86vh;
+  overflow-y: auto;
+  background: var(--bg1);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 1.1rem 1.1rem 1.25rem;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5);
+}
+
+.tg-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.tg-modal .tg-steps {
+  padding: 2px 2px 12px;
+}
+
+.tg-modal .tg-disclaimer {
+  margin-bottom: 0;
+}

@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import hmac
+import logging
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 
 from backend.auth import config
 from backend.auth.database import get_users_collection
+
+logger = logging.getLogger(__name__)
 
 _bearer = HTTPBearer(auto_error=False)
 
@@ -87,3 +91,28 @@ def get_current_user(
     if not doc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
     return public_user(doc)
+
+
+def require_service_key(
+    x_service_key: str | None = Header(None, alias="X-Service-Key"),
+) -> None:
+    """Auth for machine callers (the n8n scheduler), not users.
+
+    The alert endpoints n8n polls have no logged-in user, so a user JWT is not an
+    option there. Instead they present a shared secret in X-Service-Key. This
+    never grants access to user data endpoints — only to the two alert routes
+    that are decorated with this dependency.
+
+    Compared with hmac.compare_digest so the key cannot be recovered by timing
+    the comparison character by character.
+    """
+    configured = config.N8N_SERVICE_KEY
+    if not configured:
+        # Fail closed: if the operator never set the key, nothing may call in.
+        logger.error("N8N_SERVICE_KEY is not configured; rejecting service call")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service key not configured on the server",
+        )
+    if not x_service_key or not hmac.compare_digest(x_service_key, configured):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid service key")

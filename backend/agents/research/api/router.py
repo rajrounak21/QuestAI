@@ -33,7 +33,7 @@ class RunIn(BaseModel):
     session_id: str | None = None
     force_new: bool = False
     force_continue: bool = False
-    max_rounds: int = 3
+    max_rounds: int = 1
 
 
 class RunAccepted(BaseModel):
@@ -55,20 +55,76 @@ def _run_and_persist(
     max_rounds: int,
 ) -> None:
     """Blocking graph run in a worker thread. Never raises to the client."""
-    from backend.agents.research.main import run_research
-    from backend.database.research_sessions import set_progress
+    from backend.agents.research.main import run_research, _format_report
+    from backend.database.research_sessions import set_progress, doc_to_session_data
+    from backend.agents.research.services.progress import ResearchCancelledError, check_cancellation
+    from backend.agents.research.services.complexity import classify_complexity
+    from backend.agents.research.services.llm import init_llm
+    from backend.agents.research.graph.nodes.synthesizer import synthesizer_node
+    from backend.agents.research.graph.nodes.validator import validator_node
 
     col = get_research_collection()
     token = set_target(user_id, session_id)
     try:
-        report("planning", "Starting research")
-        # Scratch uuid: keeps server's in-memory SessionMemory out of the
-        # persistence path (Mongo doc is the source of truth, no double context).
-        result = run_research(effective_query, session_id=str(uuid.uuid4()), max_rounds=max_rounds)
+        check_cancellation()
+        doc = col.find_one({"user_id": user_id, "session_id": session_id})
+        session = doc_to_session_data(doc, session_id)
+
+        # 1. Classify complexity route
+        route = classify_complexity(raw_query, session)
+        logger.info(f"Executing research route: '{route}' for query: {raw_query[:60]}")
+
+        if route == "direct":
+            report("synthesizing", "Answering directly")
+            llm = init_llm(temperature=0.2, max_tokens=2048)
+            prompt = f"User Question: {raw_query}\n\nGoal: {session.research_goal or raw_query}\n\nProvide a concise, direct, helpful answer in 2-4 structured paragraphs."
+            raw_resp = llm.invoke(prompt)
+            answer_text = raw_resp.content if hasattr(raw_resp, "content") else str(raw_resp)
+            direct_report = {
+                "goal": session.research_goal or raw_query,
+                "executive_summary": answer_text,
+                "findings": [],
+                "comparison": "",
+                "recent_developments": "",
+                "limitations": "",
+                "sources": [],
+            }
+            formatted = _format_report(direct_report)
+            result = {
+                "report": direct_report,
+                "evidence": session.evidence,
+                "searches_performed": session.searches,
+                "formatted": formatted,
+            }
+        elif route == "evidence":
+            report("synthesizing", "Synthesizing from gathered evidence")
+            synth_state = {
+                "user_query": session.research_goal or raw_query,
+                "research_plan": session.research_plan or {"goal": session.research_goal, "sub_questions": []},
+                "evidence": session.evidence,
+                "identified_gaps": [],
+                "resynthesis_count": 0,
+            }
+            synth_res = synthesizer_node(synth_state)
+            val_res = validator_node({**synth_state, **synth_res})
+            report_dict = val_res.get("final_report") or synth_res.get("final_report")
+            formatted = _format_report(report_dict) if report_dict else ""
+            result = {
+                "report": report_dict,
+                "evidence": session.evidence,
+                "searches_performed": session.searches,
+                "formatted": formatted,
+            }
+        else:
+            # Full deep research graph
+            report("planning", "Starting deep research")
+            result = run_research(effective_query, session_id=str(uuid.uuid4()), max_rounds=max_rounds)
+
         cur = col.find_one({"user_id": user_id, "session_id": session_id}, {"status": 1})
-        if cur and cur.get("status") == "cancelled":
-            logger.info(f"Research run cancelled by user session={session_id}, dropping result")
+        if not cur or cur.get("status") == "cancelled":
+            logger.info(f"Research run cancelled or deleted by user session={session_id}, dropping result")
             return
+
         complete_session(
             user_id=user_id,
             session_id=session_id,
@@ -77,8 +133,18 @@ def _run_and_persist(
             searches=result.get("searches_performed", []),
             user_text=raw_query,
             assistant_answer=result.get("formatted", ""),
+            route=route,
         )
         set_progress(user_id, session_id, "done", "Report ready")
+    except ResearchCancelledError:
+        logger.info(f"Research run immediately stopped due to cancellation or deletion session={session_id}")
+        cur = col.find_one({"user_id": user_id, "session_id": session_id}, {"status": 1})
+        if cur:
+            col.update_one(
+                {"user_id": user_id, "session_id": session_id},
+                {"$set": {"status": "cancelled"}},
+            )
+            set_progress(user_id, session_id, "cancelled", "Cancelled by user")
     except Exception as e:
         logger.exception(f"Research run failed session={session_id}: {e}")
         col.update_one(

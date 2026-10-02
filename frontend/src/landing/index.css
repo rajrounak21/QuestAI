@@ -432,3 +432,39 @@ footer { border-top: 1px solid var(--line); padding: 44px 0 26px; }
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ---- agent LangGraph flow (dedicated pages) ---- */
+.aflow-stats { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 6px; }
+.aflow-stat { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.02em; border: 1px solid var(--line-strong); border-radius: 999px; padding: 4px 12px; color: var(--text); background: var(--surface2); }
+.aflow-chart { overflow-x: auto; }
+
+.aflow-page { padding: 40px 0 70px; }
+.aflow-back { display: inline-flex; margin-bottom: 18px; }
+.aflow-page-head h1 { margin: 8px 0 6px; font-size: clamp(1.6rem, 4vw, 2.4rem); }
+.aflow-page-head p { margin: 0; color: var(--muted); max-width: 640px; }
+.aflow-page-chart {
+  margin-top: 22px; padding: 18px;
+  height: min(78vh, 920px); min-height: 440px;
+  overflow: auto; display: flex;
+}
+.aflow-page-chart .aflow-canvas { margin: auto; }
+.aflow-zoombar {
+  position: sticky; top: 12px; z-index: 20;
+  display: flex; align-items: center; gap: 8px;
+  width: max-content; margin: 18px 0 10px auto;
+  background: var(--surface2); border: 1px solid var(--line-strong);
+  border-radius: 999px; padding: 6px 8px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+}
+.aflow-zoombar span { min-width: 48px; text-align: center; font-size: 0.8rem; font-weight: 700; color: var(--muted); }
+.aflow-zoombar button {
+  min-width: 32px; height: 32px; padding: 0 10px;
+  border-radius: 999px; border: 1px solid var(--line);
+  background: var(--surface3); color: var(--text);
+  font-size: 1rem; font-weight: 700; cursor: pointer; line-height: 1;
+}
+.aflow-zoombar button:hover:not(:disabled) { border-color: var(--accent); }
+.aflow-zoombar button:disabled { opacity: 0.35; cursor: default; }
+.aflow-zoombar .aflow-fit { font-size: 0.78rem; }
+.aflow-section-title { margin: 30px 0 4px; font-size: 1.25rem; }
+@media (max-width: 560px) { .aflow-page-chart { padding: 16px 10px 12px; } }

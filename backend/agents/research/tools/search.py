@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 
 from backend.agents.research.schemas.sources import SearchResult, SourceType
 
-load_dotenv()
+load_dotenv(override=True)
 
 logger = logging.getLogger(__name__)
 

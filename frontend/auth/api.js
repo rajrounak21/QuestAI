@@ -76,11 +76,18 @@ export const clearAuth = () => {
 // the access token with the refresh token and retries once.
 //  - { unauthorized: true } -> real auth failure (bad/expired tokens) -> go to login
 //  - { networkError: true } -> backend unreachable, tokens untouched -> show retry
-export async function authFetch(path, options = {}) {
+async function authedRequest(path, options, json) {
+  // headers is pulled out of options and merged explicitly so a caller-supplied
+  // headers object can never clobber the Authorization header.
+  const { headers: extraHeaders, ...rest } = options;
   const call = (token) =>
     fetch(`${API_BASE}${path}`, {
-      headers: { "Content-Type": "application/json", ...(options.headers || {}), Authorization: `Bearer ${token}` },
-      ...options,
+      ...rest,
+      headers: {
+        ...(json ? { "Content-Type": "application/json" } : {}),
+        ...(extraHeaders || {}),
+        Authorization: `Bearer ${token}`,
+      },
     });
 
   let res;
@@ -110,4 +117,46 @@ export async function authFetch(path, options = {}) {
     }
     return { unauthorized: true };
   }
+}
+
+export async function authFetch(path, options = {}) {
+  return authedRequest(path, options, true);
+}
+
+// For multipart/form-data bodies (e.g. resume upload). Content-Type is
+// deliberately omitted so the browser can set it with the multipart boundary —
+// hardcoding application/json (or setting it manually without a boundary)
+// corrupts the upload.
+export async function authFetchForm(path, formData, options = {}) {
+  return authedRequest(path, { method: "POST", ...options, body: formData }, false);
+}
+
+// --- Universal layer -------------------------------------------------------
+// These only CHOOSE an agent and pre-extract its form fields. Neither one runs
+// a search: the destination page pre-fills and the user presses Search.
+//
+// authFetch hands back the raw fetch Response (that is the convention every
+// other caller unwraps with .json() or unwrap()), so the parsing happens here.
+// A Response has no .agent, which is why this must not be skipped.
+
+export async function routeIntent(query) {
+  const res = await authFetch("/api/agent/route", {
+    method: "POST",
+    body: JSON.stringify({ query }),
+  });
+  if (res.unauthorized || res.networkError) return res; // flag objects, pass through
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(typeof data?.detail === "string" ? data.detail : "Request failed");
+  return data;
+}
+
+export async function askAssistant(text) {
+  const res = await authFetch("/api/assistant/chat", {
+    method: "POST",
+    body: JSON.stringify({ text }),
+  });
+  if (res.unauthorized || res.networkError) return res;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(typeof data?.detail === "string" ? data.detail : "Request failed");
+  return data;
 }

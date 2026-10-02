@@ -4,7 +4,7 @@ import os
 
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
 MONGODB_URI: str = os.getenv("MONGODB_URI", "")
 JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "")
@@ -21,3 +21,9 @@ GOOGLE_REDIRECT_URI: str = os.getenv("GOOGLE_REDIRECT_URI", "")
 AUTH_PORT: int = int(os.getenv("AUTH_PORT", ""))
 
 FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:5173")
+
+# Shared secret for the n8n scheduler. The alert endpoints that a machine calls
+# (/alerts/due, /alerts/{id}/run) take this in an X-Service-Key header instead of
+# a user JWT, because n8n is not a logged-in user. It must never reach the
+# frontend bundle - it lives only in .env and in n8n's own credentials.
+N8N_SERVICE_KEY: str = os.getenv("N8N_SERVICE_KEY", "")

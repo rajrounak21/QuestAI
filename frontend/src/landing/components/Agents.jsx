@@ -1,6 +1,10 @@
 import Reveal from "./Reveal.jsx";
 import { AGENTS } from "../data.jsx";
 
+// Research + Shopping open dedicated full-page graph flows.
+// Travel/Jobs keep scrolling to the CTA for now.
+const FLOW_LINKS = { research: "#/flow/research", shopping: "#/flow/shopping", travel: "#/flow/travel" };
+
 export default function Agents() {
   return (
     <section className="section" id="agents">
@@ -33,7 +37,11 @@ export default function Agents() {
                   {a.caps.map((c) => <li key={c}>{c}</li>)}
                 </ul>
                 <div style={{ marginTop: 16 }}>
-                  <a className="link-arrow" href="#cta" aria-label={`${a.cta} — ${a.title}`}>
+                  <a
+                    className="link-arrow"
+                    href={FLOW_LINKS[a.id] || "#cta"}
+                    aria-label={`${a.cta} — ${a.title}`}
+                  >
                     {a.cta} <span aria-hidden="true">→</span>
                   </a>
                 </div>

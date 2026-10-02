@@ -9,12 +9,16 @@ import Examples from "./components/Examples.jsx";
 import JobAlerts from "./components/JobAlerts.jsx";
 import Closing from "./components/Closing.jsx";
 import LegalPage from "./components/LegalPage.jsx";
+import FlowPage from "./components/FlowPage.jsx";
 
 function routeFromHash() {
   const h = window.location.hash;
   if (h.startsWith("#/privacy")) return "privacy";
   if (h.startsWith("#/terms")) return "terms";
   if (h.startsWith("#/about")) return "about";
+  if (h.startsWith("#/flow/research")) return "flow-research";
+  if (h.startsWith("#/flow/shopping")) return "flow-shopping";
+  if (h.startsWith("#/flow/travel")) return "flow-travel";
   return "home";
 }
 
@@ -23,6 +27,9 @@ const TITLES = {
   privacy: "Privacy Policy — QuestAI",
   terms: "Terms of Service — QuestAI",
   about: "About Us — QuestAI",
+  "flow-research": "Research flow — QuestAI",
+  "flow-shopping": "Shopping flow — QuestAI",
+  "flow-travel": "Travel flow — QuestAI",
 };
 
 export default function App() {
@@ -32,7 +39,14 @@ export default function App() {
     const r = routeFromHash();
     setRoute((prev) => {
       if (prev !== r) {
-        window.scrollTo(0, 0);
+        if (r === "home") {
+          // coming back (e.g. flow page → #agents): land on the anchor
+          const id = window.location.hash.replace("#", "");
+          if (id) requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView());
+          else window.scrollTo(0, 0);
+        } else {
+          window.scrollTo(0, 0);
+        }
       } else if (r === "home") {
         // same-page anchor (e.g. back from legal via #top): scroll to it
         const id = window.location.hash.replace("#", "");
@@ -51,7 +65,12 @@ export default function App() {
     document.title = TITLES[route];
   }, [route]);
 
-  if (route !== "home") return <div className="landing-scope"><LegalPage doc={route} /></div>;
+  if (route !== "home") {
+    if (route === "flow-research") return <div className="landing-scope"><FlowPage flowId="research" /></div>;
+    if (route === "flow-shopping") return <div className="landing-scope"><FlowPage flowId="shopping" /></div>;
+    if (route === "flow-travel") return <div className="landing-scope"><FlowPage flowId="travel" /></div>;
+    return <div className="landing-scope"><LegalPage doc={route} /></div>;
+  }
 
   return (
     <div className="landing-scope">

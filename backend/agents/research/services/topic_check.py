@@ -101,7 +101,7 @@ def route_session(
       uncertain -> {"action": "confirm", "session_id": <existing>,
                     "proposed_new_goal": current}
     """
-    # 3. Fresh query: skip topic check entirely.
+    # Fresh query: skip topic check entirely.
     if not session.conversation:
         return {"action": "fresh", "session_id": session.session_id}
 
@@ -109,23 +109,5 @@ def route_session(
         new_id = str(uuid.uuid4())
         return {"action": "new", "session_id": new_id, "new_goal": current_question}
 
-    if force_continue:
-        return {"action": "continue", "session_id": session.session_id}
-
-    result = check_topic_continuity(
-        research_goal=session.research_goal,
-        current_question=current_question,
-        recent_context=build_recent_context(session),
-    )
-    decision = result.get("decision", "uncertain")
-
-    if decision == "same":
-        return {"action": "continue", "session_id": session.session_id}
-    if decision == "new":
-        new_id = str(uuid.uuid4())
-        return {"action": "new", "session_id": new_id, "new_goal": current_question}
-    return {
-        "action": "confirm",
-        "session_id": session.session_id,
-        "proposed_new_goal": current_question,
-    }
+    # In active session, preserve conversation thread continuity
+    return {"action": "continue", "session_id": session.session_id}

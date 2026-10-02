@@ -6,7 +6,7 @@ import aiosmtplib
 from dotenv import load_dotenv
 from email.message import EmailMessage
 
-load_dotenv()
+load_dotenv(override=True)
 
 SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
 SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))

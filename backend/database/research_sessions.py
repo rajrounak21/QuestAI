@@ -10,7 +10,7 @@ MAX_RELOAD_CONVERSATION = 10
 
 # A run that reports nothing for this long is dead (server restart/kill).
 # Reads auto-heal it to failed instead of showing "running" forever.
-STALE_RUN_MINUTES = 10
+STALE_RUN_MINUTES = 1
 
 # Dashboard card needs only these fields.
 HISTORY_PROJECTION = {
@@ -79,11 +79,13 @@ def build_completion_update(
     searches: list[dict[str, Any]],
     user_text: str,
     assistant_answer: str,
+    route: str = "full",
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Returns ($set, $push) payloads for completing one research run."""
     cleaned = clean_report(report)
     set_doc: dict[str, Any] = {
         "status": "completed",
+        "last_route": route,
         "answer": assistant_answer,
         "executive_summary": (report or {}).get("executive_summary", ""),
         "report": cleaned,
@@ -95,6 +97,7 @@ def build_completion_update(
         "conversation": {
             "user": user_text,
             "assistant": assistant_answer,
+            "route": route,
             "at": _utcnow(),
         }
     }
@@ -212,9 +215,14 @@ def get_session_doc(user_id: str, session_id: str) -> dict[str, Any] | None:
 def list_history(user_id: str, limit: int = 5) -> list[dict[str, Any]]:
     from backend.database.collections import get_research_collection
 
+    col = get_research_collection()
+    running_docs = list(col.find({"user_id": user_id, "status": "running"}, {"session_id": 1, "updated_at": 1}))
+    for d in running_docs:
+        if d.get("session_id"):
+            heal_stale(user_id, d["session_id"])
+
     cur = (
-        get_research_collection()
-        .find({"user_id": user_id}, HISTORY_PROJECTION)
+        col.find({"user_id": user_id}, HISTORY_PROJECTION)
         .sort("updated_at", -1)
         .limit(limit)
     )
@@ -229,13 +237,46 @@ def complete_session(
     searches: list[dict[str, Any]],
     user_text: str,
     assistant_answer: str,
+    route: str = "full",
 ) -> None:
     from backend.database.collections import get_research_collection
 
-    set_doc, push_doc = build_completion_update(
-        report, evidence, searches, user_text, assistant_answer
+    col = get_research_collection()
+    existing_doc = col.find_one({"user_id": user_id, "session_id": session_id}, {"report": 1, "executive_summary": 1})
+    has_existing_report = bool(
+        existing_doc
+        and existing_doc.get("report")
+        and existing_doc["report"].get("executive_summary")
     )
-    get_research_collection().update_one(
+
+    cleaned = clean_report(report)
+    set_doc: dict[str, Any] = {
+        "status": "completed",
+        "last_route": route,
+        "answer": assistant_answer,
+        "updated_at": _utcnow(),
+    }
+
+    # Only set/overwrite primary report on Turn 0 (when no primary report exists yet)
+    if not has_existing_report and cleaned:
+        set_doc["report"] = cleaned
+        set_doc["executive_summary"] = (report or {}).get("executive_summary", "")
+
+    if evidence:
+        set_doc["evidence"] = (evidence or [])[:MAX_PERSIST_EVIDENCE]
+    if searches:
+        set_doc["searches"] = searches
+
+    push_doc: dict[str, Any] = {
+        "conversation": {
+            "user": user_text,
+            "assistant": assistant_answer,
+            "route": route,
+            "at": _utcnow(),
+        }
+    }
+
+    col.update_one(
         {"user_id": user_id, "session_id": session_id},
         {"$set": set_doc, "$push": push_doc},
     )

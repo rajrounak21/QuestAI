@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { researchApi, timeAgo } from "./api";
 import { getToken } from "../auth/api";
+import { useRouterPrefill } from "../src/shared/useRouterPrefill";
 import { SendIcon } from "../auth/components/icons";
 import "./Research.css";
 
-const POLL_MS = 3000;
+const POLL_MS = 1500;
 const POLL_MAX = 40;
 const STAGES = [
   { key: "planning", label: "Planning" },
@@ -37,26 +38,145 @@ function buildRefNumbers(report, evidence) {
   return { num, has: (ref) => evById.has(ref) };
 }
 
-// rich text: (ev_012)/ev_012 -> clickable [n] evidence refs
+// rich text: (ev_012)/ev_012 -> clickable evidence refs, `code` inline tags & **bold** parsing
 function renderRich(text, refs, onRef) {
   if (!text) return null;
+
+  // Split by evidence refs first (ev_012)
   const parts = String(text).split(/(\(ev_\d+\)|\bev_\d+\b)/g);
+
   return parts.map((p, i) => {
     const m = p.match(/^\(?(ev_\d+)\)?$/);
-    if (m && refs.has(m[1])) {
+    if (m && refs?.has && refs.has(m[1])) {
       return (
         <button key={i} className="rs-ref" title="View evidence" onClick={() => onRef(m[1])}>
           [{refs.num(m[1])}]
         </button>
       );
     }
-    return <span key={i}>{p}</span>;
+
+    // Split by inline code backticks `code` or single-quoted identifiers 'code'
+    const codeTokens = p.split(/(`[^`]+`|'[^']{2,35}')/g);
+    return codeTokens.map((cToken, cIdx) => {
+      // Inline backtick code: `Retriever.evaluate`
+      if (cToken.startsWith("`") && cToken.endsWith("`") && cToken.length > 2) {
+        return (
+          <code key={`${i}-${cIdx}`} className="rs-inline-code">
+            {cToken.slice(1, -1)}
+          </code>
+        );
+      }
+      // Single quoted code identifiers: 'Retriever.evaluate' or 'openai-evals'
+      if (
+        cToken.startsWith("'") &&
+        cToken.endsWith("'") &&
+        cToken.length > 2 &&
+        /^[A-Za-z0-9_.\-@ ()]+$/.test(cToken.slice(1, -1)) &&
+        !cToken.includes(" ")
+      ) {
+        return (
+          <code key={`${i}-${cIdx}`} className="rs-inline-code">
+            {cToken.slice(1, -1)}
+          </code>
+        );
+      }
+
+      // Parse **bold** markdown tokens inside text
+      const boldTokens = cToken.split(/(\*\*[^*]+\*\*)/g);
+      return boldTokens.map((sub, sIdx) => {
+        if (sub.startsWith("**") && sub.endsWith("**") && sub.length > 4) {
+          return <strong key={`${i}-${cIdx}-${sIdx}`}>{sub.slice(2, -2)}</strong>;
+        }
+        return <span key={`${i}-${cIdx}-${sIdx}`}>{sub}</span>;
+      });
+    });
   });
 }
 
+function renderMarkdown(text, refs, onRef) {
+  if (!text) return null;
+
+  // Split text into blocks by double newlines or table blocks
+  const rawBlocks = String(text).split(/\n{2,}/g);
+
+  return rawBlocks.map((block, bIdx) => {
+    const trimmed = block.trim();
+    if (!trimmed) return null;
+
+    // 1. Check for Markdown Table syntax: | col1 | col2 |\n|---|---|
+    const lines = trimmed.split("\n").map((l) => l.trim()).filter(Boolean);
+    if (lines.length >= 2 && lines[0].includes("|") && lines[1].includes("|") && lines[1].includes("-")) {
+      const headers = lines[0].split("|").map((cell) => cell.trim()).filter((c) => c.length > 0);
+      const dataRows = lines.slice(2).map((row) =>
+        row.split("|").map((cell) => cell.trim()).filter((c) => c.length > 0)
+      );
+
+      return (
+        <div key={bIdx} className="rs-table-wrapper">
+          <table className="rs-table">
+            <thead>
+              <tr>
+                {headers.map((h, hIdx) => (
+                  <th key={hIdx}>{renderRich(h, refs, onRef)}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {dataRows.map((row, rIdx) => (
+                <tr key={rIdx}>
+                  {row.map((cell, cIdx) => (
+                    <td key={cIdx}>{renderRich(cell, refs, onRef)}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+
+    // 2. Check for Bullet or Numbered Lists
+    if (lines.length > 1 && lines.every((l) => l.startsWith("- ") || l.startsWith("* ") || /^\d+\.\s/.test(l))) {
+      return (
+        <ul key={bIdx} className="rs-list">
+          {lines.map((l, lIdx) => {
+            const cleanLine = l.replace(/^[-*]\s+/, "").replace(/^\d+\.\s+/, "");
+            return <li key={lIdx}>{renderRich(cleanLine, refs, onRef)}</li>;
+          })}
+        </ul>
+      );
+    }
+
+    // 3. Check for Headings
+    if (trimmed.startsWith("### ")) {
+      return <h4 key={bIdx} className="rs-md-h4">{renderRich(trimmed.replace(/^###\s+/, ""), refs, onRef)}</h4>;
+    }
+    if (trimmed.startsWith("## ")) {
+      return <h3 key={bIdx} className="rs-md-h3">{renderRich(trimmed.replace(/^##\s+/, ""), refs, onRef)}</h3>;
+    }
+
+    // 4. Default Paragraph
+    return (
+      <p key={bIdx} className="rs-para">
+        {renderRich(trimmed, refs, onRef)}
+      </p>
+    );
+  });
+}
+
+function cleanAssistantAnswer(text) {
+  if (!text) return "";
+  return text
+    .replace(/^#\s+Research Report\n?/gi, "")
+    .replace(/\*\*Goal:\*\*[^\n]*\n?/gi, "")
+    .replace(/^##\s+/gm, "")
+    .trim();
+}
+
 function runSeconds(doc) {
-  const t = doc?.started_at ? new Date(doc.started_at).getTime() : NaN;
-  if (Number.isNaN(t)) return 0;
+  const raw = doc?.started_at || doc?.created_at;
+  const t = parseIso(raw);
+  if (!t) return 0;
   return Math.max(0, Math.floor((Date.now() - t) / 1000));
 }
 
@@ -69,9 +189,21 @@ function fmtElapsed(total) {
   return `${h}h ${String(m % 60).padStart(2, "0")}m`;
 }
 
+function parseIso(iso) {
+  if (!iso) return 0;
+  let str = String(iso);
+  if (!str.endsWith("Z") && !str.includes("+") && !str.includes("Z")) {
+    str += "Z";
+  }
+  const t = new Date(str).getTime();
+  return Number.isNaN(t) ? 0 : t;
+}
+
 function isFresh(doc) {
-  const t = new Date(doc?.progress?.at || doc?.updated_at || 0).getTime();
-  return !Number.isNaN(t) && Date.now() - t < 90000;
+  const raw = doc?.progress?.at || doc?.updated_at || doc?.started_at;
+  const t = parseIso(raw);
+  if (!t) return false;
+  return Date.now() - t < 120000;
 }
 
 // new-chat icon (ChatGPT-style square-pen) — exact reference SVG
@@ -96,12 +228,40 @@ function PanelSvg() {
   );
 }
 
-function HomeSvg() {
+// Dashboard grid, matching the icon the other agent pages use for /home.
+// The old roof-shaped HomeSvg read as "back to landing" rather than "back to
+// the QuestAI dashboard".
+function DashboardSvg() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
       strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M3 10.5 12 3l9 7.5" />
-      <path d="M5 9.5V21h14V9.5" />
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+    </svg>
+  );
+}
+
+function TrashSvg() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 6h18" />
+      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+      <line x1="10" y1="11" x2="10" y2="17" />
+      <line x1="14" y1="11" x2="14" y2="17" />
+    </svg>
+  );
+}
+
+function CloseSvg() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
     </svg>
   );
 }
@@ -117,7 +277,9 @@ export default function Research() {
   const [input, setInput] = useState("");
   const [running, setRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+  const [stale, setStale] = useState(false); // running but no fresh progress
   const [confirm, setConfirm] = useState(null); // { proposed }
+  const [deleteTarget, setDeleteTarget] = useState(null); // session to delete
   const [inspector, setInspector] = useState(null); // evidence item
   const [openFindings, setOpenFindings] = useState({});
   const [panelOpen, setPanelOpen] = useState(false);
@@ -125,8 +287,18 @@ export default function Research() {
 
   const pollRef = useRef(null);
   const autoRunRef = useRef(false);
+  const routerPrefill = useRouterPrefill("research");
   const elapsedRef = useRef(null);
   const startedRef = useRef(null);
+  const staleRef = useRef(false);
+  const inputRef = useRef(null);
+
+  const handleTipClick = (q) => {
+    setInput(q);
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  };
 
   const loadSessions = async () => {
     try {
@@ -144,15 +316,26 @@ export default function Research() {
     elapsedRef.current = null;
   };
 
-  const pollUntilDone = (id) => {
+  const pollUntilDone = (id, initialDoc = null) => {
     stopPoll();
     setRunning(true);
-    startedRef.current = null;
-    setElapsed(0);
+    staleRef.current = false;
+
+    if (initialDoc) {
+      startedRef.current = initialDoc.started_at || initialDoc.created_at || null;
+      setElapsed(runSeconds(initialDoc));
+      setStale(false);
+    } else {
+      startedRef.current = null;
+      setElapsed(0);
+      setStale(false);
+    }
+
     elapsedRef.current = setInterval(
       () => setElapsed(runSeconds({ started_at: startedRef.current })),
       1000
     );
+
     let tries = 0;
     let errs = 0;
     pollRef.current = setInterval(async () => {
@@ -160,20 +343,33 @@ export default function Research() {
       try {
         const d = await researchApi.getSession(id);
         errs = 0;
-        startedRef.current = d.started_at || startedRef.current;
+        startedRef.current = d.started_at || d.created_at || startedRef.current;
         setElapsed(runSeconds(d));
         setDoc(d);
         if (d.status !== "running") {
           stopPoll();
           setRunning(false);
+          setStale(false);
+          staleRef.current = false;
           loadSessions();
         } else if (isFresh(d)) {
-          tries = 0; // server is alive and working — keep watching, no 120s cutoff
-        } else if (tries >= POLL_MAX) {
-          stopPoll();
-          setRunning(false);
-          loadSessions();
-          setNotice("Still working — refresh in a bit. The run continues on the server.");
+          // Server is alive and writing progress — reset stale + tries
+          tries = 0;
+          if (staleRef.current) {
+            staleRef.current = false;
+            setStale(false);
+          }
+        } else {
+          // Only mark stale if no updates received after 8 consecutive polls (12s+)
+          if (tries >= 8 && !staleRef.current) {
+            staleRef.current = true;
+            setStale(true);
+          }
+          if (tries >= POLL_MAX) {
+            stopPoll();
+            setRunning(false);
+            loadSessions();
+          }
         }
       } catch (e) {
         if (e.code === "unauthorized") {
@@ -183,6 +379,7 @@ export default function Research() {
         } else if (++errs >= 10) {
           stopPoll();
           setRunning(false);
+          setStale(false);
           setNotice("Lost connection to the server. Restart the backend and refresh.");
         }
       }
@@ -192,9 +389,24 @@ export default function Research() {
   const submit = async (rawQuery, opts = {}) => {
     const query = (rawQuery || "").trim();
     if (!query || running) return;
+
+    // Instant UI feedback: clear input and lock running state immediately
+    setInput("");
+    setRunning(true);
     setNotice("");
     setInspector(null);
     setConfirm(null);
+
+    // Optimistically update document conversation if active session exists
+    if (doc) {
+      setDoc((prev) => {
+        if (!prev) return prev;
+        const conv = [...(prev.conversation || [])];
+        conv.push({ user: query, assistant: "" });
+        return { ...prev, conversation: conv, status: "running" };
+      });
+    }
+
     const targetId = opts.force_new ? undefined : sessionId;
     try {
       const res = await researchApi.run({
@@ -204,16 +416,17 @@ export default function Research() {
         force_continue: opts.force_continue,
       });
       if (res.needs_confirm) {
+        setRunning(false);
         setConfirm({ proposed: res.proposed_new_goal || query });
         return;
       }
-      setInput("");
       if (!targetId || res.session_id !== targetId) {
         navigate(`/research/${res.session_id}`, { replace: !targetId });
       }
       setPanelOpen(false);
       pollUntilDone(res.session_id);
     } catch (e) {
+      setRunning(false);
       if (e.code === "unauthorized") {
         navigate("/login", { replace: true });
         return;
@@ -222,6 +435,7 @@ export default function Research() {
         pollUntilDone(e.detail.session_id); // already running — attach to it
         return;
       }
+      setInput(query); // restore query so user doesn't lose text
       setNotice(e.message || "Research failed to start.");
     }
   };
@@ -242,6 +456,7 @@ export default function Research() {
     if (!sessionId) {
       setDoc(null);
       setRunning(false);
+      setStale(false);
       stopPoll();
       return;
     }
@@ -251,9 +466,12 @@ export default function Research() {
       .then((d) => {
         if (!alive) return;
         setDoc(d);
-        if (d.status === "running") pollUntilDone(sessionId);
-        else {
+        if (d.status === "running") {
+          // Pass the doc so pollUntilDone can detect stale immediately
+          pollUntilDone(sessionId, d);
+        } else {
           setRunning(false);
+          setStale(false);
           stopPoll();
         }
       })
@@ -266,13 +484,16 @@ export default function Research() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
-  // auto-run ?q= once (StrictMode-safe)
+  // ?q= from the dashboard only PREFILLS the ask box. It used to call submit(q)
+  // here, which started a research run on arrival. handleTipClick is the same
+  // prefill-only path the empty-state tip cards already use.
   useEffect(() => {
     const q = searchParams.get("q");
     if (!q || autoRunRef.current || sessionId) return;
     autoRunRef.current = true;
     setSearchParams({}, { replace: true });
-    submit(q);
+    // The router's extracted query is cleaner than the raw sentence.
+    handleTipClick(routerPrefill?.fields?.query || q);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, sessionId]);
 
@@ -280,6 +501,8 @@ export default function Research() {
     stopPoll();
     startedRef.current = null;
     setRunning(false);
+    setStale(false);
+    staleRef.current = false;
     setDoc(null);
     setInput("");
     setConfirm(null);
@@ -308,13 +531,15 @@ export default function Research() {
 
   const cancelRun = async () => {
     if (!sessionId) return;
+    stopPoll();
+    setRunning(false);
+    setStale(false);
+    setDoc((prev) => (prev ? { ...prev, status: "cancelled" } : null));
     try {
       await researchApi.cancel(sessionId);
     } catch {
-      /* server already forgot it — just stop polling */
+      /* ignore error */
     }
-    stopPoll();
-    setRunning(false);
     const d = await researchApi.getSession(sessionId).catch(() => null);
     if (d) setDoc(d);
     loadSessions();
@@ -340,10 +565,17 @@ export default function Research() {
             {doc && (
               <span className="rs-meta">
                 {statusDot(doc.status)} {doc.status}
+                {doc.last_route && doc.last_route !== "full" && (
+                  <span className="rs-quality" style={{ opacity: 0.85 }}>
+                    {" "}· {doc.last_route} mode
+                  </span>
+                )}
                 {quality && quality !== "unknown" && (
                   <span className="rs-quality"> · {quality} ✓</span>
                 )}
-                <span className="rs-meta-time"> · {timeAgo(doc.updated_at)}</span>
+                {doc.status !== "running" && (
+                  <span className="rs-meta-time"> · {timeAgo(doc.updated_at)}</span>
+                )}
               </span>
             )}
           </div>
@@ -352,36 +584,12 @@ export default function Research() {
           </button>
         </header>
 
-        {notice && <p className="rs-notice">{notice}</p>}
-
-        {running && (() => {
-          const stage = doc?.progress?.stage;
-          const detail = doc?.progress?.detail;
-          const found = STAGES.findIndex((s) => s.key === stage);
-          const cur = found < 0 ? 0 : found;
-          return (
-            <section className="rs-pipe" aria-live="polite">
-              {STAGES.map((s, i) => (
-                <span key={s.key} className={`rs-pipe-step${i > cur ? " rs-pipe-todo" : ""}`}>
-                  {i < cur ? (
-                    <span className="rs-done">✓</span>
-                  ) : i === cur ? (
-                    <span className="rs-pulse" />
-                  ) : (
-                    <span className="rs-todo-dot" />
-                  )}
-                  {s.label}
-                </span>
-              ))}
-              <span className="rs-pipe-time">
-                {detail || "Starting…"} · {fmtElapsed(elapsed)}
-              </span>
-              <button className="rs-cancel" onClick={cancelRun}>
-                ✕ Cancel
-              </button>
-            </section>
-          );
-        })()}
+        {notice && (
+          <div className="rs-alert rs-alert-warn" role="alert">
+            <span className="rs-alert-icon">⚠</span>
+            <span className="rs-alert-body">{notice}</span>
+          </div>
+        )}
 
         {loading ? (
           <p className="rs-loading">Loading workspace...</p>
@@ -392,7 +600,7 @@ export default function Research() {
             <div className="rs-empty-grid">
               {["Compare RAG evaluation frameworks", "MIRAGE dataset for RAG evaluation", "TREC 2025 RAG track methods"].map(
                 (q) => (
-                  <button key={q} className="rs-empty-card" onClick={() => submit(q)}>
+                  <button key={q} type="button" className="rs-empty-card" onClick={() => handleTipClick(q)}>
                     “{q}”
                   </button>
                 )
@@ -402,17 +610,15 @@ export default function Research() {
         ) : (
           doc && (
             <article className="rs-doc">
-              {doc.conversation?.length > 1 && (
-                <section className="rs-thread">
-                  <p className="rs-sect">Thread</p>
-                  {doc.conversation.slice(0, -1).map((t, i) => (
-                    <p key={i} className="rs-thread-q">
-                      <strong>Q{i + 1}.</strong> {(t.user || "").slice(0, 160)}
-                    </p>
-                  ))}
-                </section>
-              )}
+              {/* Q1 User Prompt (Right Aligned) */}
+              <div className="rs-user-prompt-wrap">
+                <div className="rs-user-prompt">
+                  <span className="rs-user-q-num">Q1</span>
+                  <span className="rs-user-q-text">{doc.conversation?.[0]?.user || doc.query}</span>
+                </div>
+              </div>
 
+              {/* Primary Research Report Canvas */}
               {report?.executive_summary && (
                 <section>
                   <p className="rs-sect">Executive summary</p>
@@ -507,9 +713,38 @@ export default function Research() {
                 </section>
               )}
 
+              {/* Follow-up Questions Section */}
+              {doc.conversation && doc.conversation.length > 1 && (
+                <section className="rs-followups-section">
+                  {doc.conversation.slice(1).map((t, i) => (
+                    <article key={i} className="rs-followup-turn">
+                      {/* Q2, Q3 User Prompt (Right Aligned) */}
+                      <div className="rs-user-prompt-wrap">
+                        <div className="rs-user-prompt">
+                          <span className="rs-user-q-num">Q{i + 2}</span>
+                          <span className="rs-user-q-text">{t.user}</span>
+                        </div>
+                      </div>
+
+                      {/* Assistant Answer (Left Aligned Full Width) */}
+                      <div className="rs-followup-body">
+                        {t.route && t.route !== "full" && (
+                          <span className="rs-route-tag">{t.route} mode</span>
+                        )}
+                        {t.assistant ? (
+                          renderMarkdown(cleanAssistantAnswer(t.assistant), refs, openRef)
+                        ) : (
+                          <p className="rs-text-muted">Generating answer...</p>
+                        )}
+                      </div>
+                    </article>
+                  ))}
+                </section>
+              )}
+
               {doc.status === "failed" && (
                 <p className="rs-notice">
-                  This run failed{doc.error ? `: ${doc.error}` : "."} Ask again to retry.
+                  This run failed{doc.error ? `: ${doc.error}` : ". Ask again to retry."}
                 </p>
               )}
               {doc.status === "cancelled" && (
@@ -519,20 +754,115 @@ export default function Research() {
           )
         )}
 
+        {/* Floating Sticky Progress Pipeline — ALWAYS visible above input bar when running */}
+        {(() => {
+          const isRunning = running || doc?.status === "running";
+          if (!isRunning) return null;
+
+          const stage = doc?.progress?.stage;
+          const detail = doc?.progress?.detail;
+          const found = STAGES.findIndex((s) => s.key === stage);
+          const cur = found < 0 ? 0 : found;
+
+          if (stale) {
+            return (
+              <div className="rs-floating-progress-wrap">
+                <section className="rs-stale rs-pipe-floating" aria-live="polite">
+                  <div className="rs-stale-header">
+                    <span className="rs-stale-icon">⚠</span>
+                    <div>
+                      <p className="rs-stale-title">Session appears stuck</p>
+                      <p className="rs-stale-sub">
+                        The backend task is taking longer than expected or the server was restarted.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="rs-stale-stages">
+                    {STAGES.map((s, i) => (
+                      <span key={s.key} className={`rs-pipe-step${i > cur ? " rs-pipe-todo" : ""}`}>
+                        {i < cur ? (
+                          <span className="rs-done">✓</span>
+                        ) : i === cur ? (
+                          <span className="rs-stale-spin" />
+                        ) : (
+                          <span className="rs-todo-dot" />
+                        )}
+                        {s.label}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="rs-stale-actions">
+                    <button className="rs-cancel rs-cancel-danger" onClick={cancelRun}>
+                      Cancel run
+                    </button>
+                    <span className="rs-stale-hint">Polling for backend updates…</span>
+                  </div>
+                </section>
+              </div>
+            );
+          }
+
+          return (
+            <div className="rs-floating-progress-wrap">
+              <section className="rs-pipe rs-pipe-floating" aria-live="polite">
+                {STAGES.map((s, i) => (
+                  <span key={s.key} className={`rs-pipe-step${i > cur ? " rs-pipe-todo" : ""}`}>
+                    {i < cur ? (
+                      <span className="rs-done">✓</span>
+                    ) : i === cur ? (
+                      <span className="rs-pulse" />
+                    ) : (
+                      <span className="rs-todo-dot" />
+                    )}
+                    {s.label}
+                  </span>
+                ))}
+                <span className="rs-pipe-time">
+                  {detail || "In progress…"} · {fmtElapsed(elapsed)}
+                </span>
+                <button className="rs-cancel" onClick={cancelRun}>
+                  ✕ Cancel
+                </button>
+              </section>
+            </div>
+          );
+        })()}
+
         <form
           className="rs-ask"
           onSubmit={(e) => {
             e.preventDefault();
-            submit(input);
+            if (input.trim() && !running) {
+              submit(input);
+            }
           }}
         >
           <input
+            ref={inputRef}
             placeholder={running ? "Researching — input locked..." : "Ask a follow-up or start a topic..."}
             value={input}
             disabled={running}
             onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                if (input.trim() && !running) {
+                  submit(input);
+                }
+              }
+            }}
           />
-          <button type="submit" aria-label="Send" disabled={running || !input.trim()}>
+          <button
+            type="submit"
+            aria-label="Send"
+            disabled={running || !input.trim()}
+            onClick={(e) => {
+              e.preventDefault();
+              if (input.trim() && !running) {
+                submit(input);
+              }
+            }}
+          >
             <SendIcon />
           </button>
         </form>
@@ -551,20 +881,20 @@ export default function Research() {
           <PanelSvg />
         </button>
         <div className="rs-rail-spacer" />
-        <Link to="/home" className="rs-rail-btn" title="Home" aria-label="Home">
-          <HomeSvg />
+        <Link to="/home" className="rs-rail-btn" title="Dashboard" aria-label="Dashboard">
+          <DashboardSvg />
         </Link>
       </aside>
 
       {/* sessions — slide-over panel from right, all screens */}
       <aside className={`rs-sessions${panelOpen ? " open" : ""}`} aria-label="Sessions">
         <div className="rs-sess-head">
-          <button className="auth-link" onClick={() => setPanelOpen(false)} aria-label="Close sessions">
-            ✕
+          <button className="rs-close-btn" onClick={() => setPanelOpen(false)} aria-label="Close sessions" title="Close">
+            <CloseSvg />
           </button>
           <span className="rs-sess-actions">
-            <Link to="/home" className="rs-rail-btn" title="Home" aria-label="Home">
-              <HomeSvg />
+            <Link to="/home" className="rs-rail-btn" title="Dashboard" aria-label="Dashboard">
+              <DashboardSvg />
             </Link>
             <button className="rs-rail-btn" title="New chat" onClick={newChat} aria-label="New chat">
               <NewChatSvg />
@@ -590,9 +920,12 @@ export default function Research() {
                 className="rs-sess-del"
                 title="Delete session"
                 aria-label="Delete session"
-                onClick={() => deleteSession(s.session_id)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDeleteTarget(s);
+                }}
               >
-                ✕
+                <TrashSvg />
               </button>
             </div>
           ))}
@@ -600,14 +933,54 @@ export default function Research() {
       </aside>
       {panelOpen && <div className="rs-scrim" onClick={() => setPanelOpen(false)} />}
 
+      {/* delete session confirmation modal */}
+      {deleteTarget && (
+        <div className="rs-insp-wrap" style={{ display: "grid", placeItems: "center" }}>
+          <div className="rs-insp" style={{ height: "auto", borderRadius: 16, width: "min(400px, 90vw)" }}>
+            <div className="rs-insp-head">
+              <strong>Delete Session?</strong>
+              <button className="rs-close-btn" onClick={() => setDeleteTarget(null)} aria-label="Close">
+                <CloseSvg />
+              </button>
+            </div>
+            <p style={{ marginTop: 10, marginBottom: 6, fontSize: 14 }}>
+              Are you sure you want to delete this research session?
+            </p>
+            <p style={{ color: "var(--muted)", fontSize: 13, marginBottom: 18, fontStyle: "italic", wordBreak: "break-word" }}>
+              “{deleteTarget.query}”
+            </p>
+            <div className="rs-confirm-row" style={{ justifyContent: "flex-end" }}>
+              <button
+                className="rs-cancel"
+                style={{ padding: "8px 16px", fontSize: 13 }}
+                onClick={() => setDeleteTarget(null)}
+              >
+                Cancel
+              </button>
+              <button
+                className="rs-cancel rs-cancel-danger"
+                style={{ padding: "8px 16px", fontSize: 13 }}
+                onClick={() => {
+                  const id = deleteTarget.session_id;
+                  setDeleteTarget(null);
+                  deleteSession(id);
+                }}
+              >
+                Delete session
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* evidence inspector overlay */}
       {inspector && (
         <div className="rs-insp-wrap">
           <div className="rs-insp">
             <div className="rs-insp-head">
               <strong>{inspector.id}</strong>
-              <button className="auth-link" onClick={() => setInspector(null)}>
-                Close ✕
+              <button className="rs-close-btn" onClick={() => setInspector(null)} aria-label="Close">
+                <CloseSvg />
               </button>
             </div>
             <p className="rs-insp-claim">“{inspector.claim}”</p>

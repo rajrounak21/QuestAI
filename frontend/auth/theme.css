@@ -442,31 +442,112 @@ html[data-theme="light"] .auth-page .otp-expired { color: #ff8a8e; }
 .dash-ask {
   display: flex; gap: 8px; align-items: center;
   background: var(--bg2); border: 1px solid var(--line);
-  border-radius: 16px; padding: 10px 10px 10px 20px;
+  border-radius: 16px; padding: 10px 10px 10px 12px;
   max-width: 680px; margin: 0 auto;
+  /* Without this the input's intrinsic width (~20 chars) plus the agent
+     button and send button exceed a 375px phone, and the send button gets
+     clipped off the right edge. */
+  width: 100%;
+  box-sizing: border-box;
 }
+.dash-ask > input { min-width: 0; flex: 1 1 auto; }
 .dash-ask:focus-within { border-color: var(--accent); }
+/* Agent select, inside the input bar. The menu is a real element in the page,
+   not an OS popup, so it follows the theme instead of fighting it. */
+.dash-ask-agent { position: relative; flex: none; }
+.dash-agent-btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 44px; padding: 0 11px 0 13px;
+  background: var(--bg1);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--text);
+  font-family: inherit; font-size: 14px; font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.dash-agent-btn:hover:not(:disabled) { border-color: var(--accent); }
+.dash-agent-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.dash-agent-btn.is-open {
+  border-color: var(--accent);
+  background: rgba(91, 124, 255, 0.12);
+}
+.dash-agent-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.dash-agent-btn svg { color: var(--muted); flex: none; }
+.dash-agent-btn.is-open svg { color: var(--accent); }
+
+.dash-agent-menu {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 40;
+  min-width: 244px; margin: 0; padding: 5px;
+  list-style: none;
+  background: var(--bg1);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  animation: dashMenuIn 0.12s ease-out;
+  /* 7 agents is ~500px tall — taller than the space below the input on a
+     laptop and far taller on a phone, so the list scrolls inside the panel. */
+  max-height: min(58vh, 340px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+.dash-agent-menu.is-up { top: auto; bottom: calc(100% + 6px); }
+.dash-agent-menu::-webkit-scrollbar { width: 8px; }
+.dash-agent-menu::-webkit-scrollbar-track { background: transparent; }
+.dash-agent-menu::-webkit-scrollbar-thumb {
+  background: var(--line); border-radius: 999px;
+  border: 2px solid transparent; background-clip: content-box;
+}
+.dash-agent-menu::-webkit-scrollbar-thumb:hover { background-clip: content-box; background-color: var(--faint); }
+@keyframes dashMenuIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.dash-agent-menu.is-up { animation-name: dashMenuInUp; }
+@keyframes dashMenuInUp {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.dash-agent-opt {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; width: 100%;
+  padding: 8px 10px;
+  border: none; border-radius: 8px;
+  background: none; color: var(--text);
+  font-family: inherit; text-align: left; cursor: pointer;
+}
+.dash-agent-opt.is-active { background: var(--soft); }
+.dash-agent-opt.is-sel .dash-agent-opt-label { color: var(--accent); }
+.dash-agent-opt-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.dash-agent-opt-label { font-size: 14px; font-weight: 600; }
+.dash-agent-opt-hint {
+  font-size: 11.5px; color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.dash-agent-opt svg { color: var(--accent); flex: none; }
+
+/* The old pill row is gone, so its styles are dead. */
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
 .dash-ask input {
   flex: 1; background: none; border: 0; outline: none;
   color: var(--text); font-size: 15px; height: 44px;
 }
 .dash-ask input::placeholder { color: var(--faint); }
-.dash-ask button {
+/* Scoped to the submit button: the agent control is also a <button> in here,
+   and this used to repaint it with the accent gradient. */
+.dash-ask > button[type="submit"] {
   flex: none; width: 44px; height: 44px; border: 0; border-radius: 12px;
   background: var(--grad); color: #fff; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
 }
+.dash-ask > button[type="submit"]:disabled { opacity: 0.55; cursor: not-allowed; }
 .dash-hint { color: var(--muted); font-size: 13px; margin: 12px 0 0; }
-.dash-pills { margin-top: 20px; }
-.dash-pills-label { font-size: 13px; font-weight: 600; color: var(--muted); }
-.dash-pills-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 10px; }
-.dash-pill {
-  border: 1px solid var(--line); background: var(--soft);
-  color: var(--muted); font-size: 13px; font-weight: 600;
-  padding: 8px 16px; border-radius: 999px; cursor: pointer;
-  display: inline-flex; align-items: center; gap: 6px;
-}
-.dash-pill.active { color: var(--text); border-color: var(--accent); background: rgba(91, 124, 255, 0.16); }
 .dash-sect-label { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin: 34px 0 4px; }
 .dash-sect-sub { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
 .dash-suggest { text-align: left; max-width: 680px; margin: 26px auto 0; }
@@ -480,13 +561,71 @@ html[data-theme="light"] .auth-page .otp-expired { color: #ff8a8e; }
 .dash-suggest-card:hover { border-color: var(--accent); }
 .dash-suggest-card strong { font-size: 12px; color: var(--accent); }
 .dash-suggest-card span { font-size: 13px; color: var(--text); }
-.dash-route {
-  margin-top: 26px; border: 1px solid var(--line); background: var(--bg2);
-  border-radius: 14px; padding: 20px 22px; text-align: center;
+/* --- inline conversation, directly under the ask box -------------------
+   A compact chat, not a status card: the user just typed something, so the
+   answer belongs right there. Bubbles hug their content and stay narrow so a
+   one-line greeting does not open a full-width empty box. */
+.dash-chat {
+  /* Must match .dash-ask (680px) or the bubbles sit 20px inside the input. */
+  max-width: 680px;
+  margin: 14px auto 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
 }
-.dash-route-q { font-size: 15px; margin: 2px 0 10px; }
-.dash-steps p { color: var(--muted); font-size: 13px; margin: 5px 0; display: flex; align-items: center; justify-content: center; gap: 6px; }
-.dash-steps .dash-core { color: var(--text); font-weight: 700; }
+.dash-chat-row { display: flex; }
+.dash-chat-you { justify-content: flex-end; }
+.dash-chat-bubble {
+  max-width: 78%;
+  padding: 9px 13px;
+  border-radius: 14px;
+  font-size: 14px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+.dash-chat-you .dash-chat-bubble {
+  background: var(--accent-soft);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-bottom-right-radius: 4px;
+}
+.dash-chat-bubble-bot {
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-bottom-left-radius: 4px;
+}
+.dash-chat-bubble-err { color: #f87171; border-color: rgba(239, 68, 68, 0.35); }
+/* In normal flow, not absolute: an absolutely placed close button drifts to
+   the far edge of the 680px box and detaches from a short bubble. */
+.dash-chat-close {
+  align-self: flex-end;
+  margin-top: 2px;
+  width: 24px; height: 24px;
+  display: grid; place-items: center;
+  border: 1px solid var(--line); border-radius: 999px;
+  background: none; color: var(--muted);
+  font-size: 17px; line-height: 1; cursor: pointer;
+  padding: 0 0 2px;
+}
+.dash-chat-close:hover { color: var(--text); border-color: var(--accent); }
+/* Three-dot typing indicator. */
+.dash-chat-dots { display: inline-flex; gap: 4px; align-items: center; padding: 2px 0; }
+.dash-chat-dots i {
+  width: 5px; height: 5px; border-radius: 999px;
+  background: var(--muted); display: block;
+  animation: dashDot 1.1s ease-in-out infinite;
+}
+.dash-chat-dots i:nth-child(2) { animation-delay: 0.15s; }
+.dash-chat-dots i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes dashDot {
+  0%, 60%, 100% { opacity: 0.25; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-2px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dash-chat-dots i { animation: none; opacity: 0.6; }
+}
 .dash-activity { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 10px; }
 .dash-act-card {
   border: 1px solid var(--line); background: var(--bg2);
@@ -533,4 +672,44 @@ html[data-theme="light"] .auth-page .otp-expired { color: #ff8a8e; }
   .auth-brand { padding: 32px 24px; border-right: 0; border-bottom: 1px solid var(--line); }
   .auth-headline { font-size: 26px; }
   .auth-lede { margin-bottom: 16px; }
+}
+
+/* ---- phones: the ask bar gets cramped, so it wraps to two rows ----
+   At 375px the agent button, input and send button cannot share one line
+   without clipping the send button off the edge. The agent moves to its own
+   row above the input instead of being squeezed. */
+@media (max-width: 560px) {
+  .dash-ask {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px;
+    border-radius: 14px;
+  }
+  /* The wrapper is flex:none on desktop, so it hugs the button. On a phone it
+     must grow to a full row first, otherwise the 100% button inside it has
+     nothing to fill, and the menu anchored to it would be button-width. */
+  .dash-ask-agent { order: 1; flex: 1 1 100%; width: 100%; }
+  .dash-agent-btn { flex: 1 1 auto; justify-content: space-between; width: 100%; }
+  .dash-ask > input { order: 2; flex: 1 1 auto; }
+  .dash-ask > button[type="submit"] { order: 3; }
+
+  /* Menu anchored to the whole bar, not just the button, or it clips. */
+  .dash-agent-menu {
+    left: 0; right: 0;
+    min-width: 0; width: 100%;
+    max-height: min(56vh, 320px);
+  }
+  .dash-agent-menu.is-up { left: 0; right: 0; }
+
+  .dash-chat { max-width: 100%; }
+  .dash-chat-bubble { max-width: 88%; }
+  .dash-hero h1 { font-size: clamp(24px, 7vw, 32px); }
+  .dash-hero .auth-sub { font-size: 14.5px; }
+}
+
+/* Very narrow (iPhone SE and below): shorten the hint so it does not wrap
+   into three lines under the input. */
+@media (max-width: 380px) {
+  .dash-hint { font-size: 12px; }
+  .dash-agent-opt-hint { display: none; }
 }
