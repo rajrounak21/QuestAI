@@ -78,7 +78,7 @@ export const FLOWS = {
       extract: { x: 220, y: 100, w: 200, h: 100, title: "Extract params", tag: "rule", lines: ["deterministic ·", "0 LLM calls"] },
       validate: { x: 220, y: 240, w: 200, h: 64, title: "Validate", tag: "rule", lines: ["empty / too short?"] },
       valid: { x: 220, y: 344, w: 200, h: 100, kind: "diamond", title: "Valid?" },
-      followup: { x: 30, y: 484, w: 170, h: 100, dashed: true, title: "Ask follow-up", lines: ["too short →", "stop here"] },
+      askUser: { x: 30, y: 484, w: 170, h: 100, dashed: true, title: "Agent asks", lines: ["query too short", "run stops"] },
       search: { x: 220, y: 484, w: 200, h: 100, title: "Search", tag: "2× API", lines: ["Google + Amazon parallel", "normalize → dedupe"] },
       save: { x: 170, y: 624, w: 300, h: 44, kind: "pill", dashed: true, title: "Save session + search", tag: "MongoDB" },
     },
@@ -86,7 +86,7 @@ export const FLOWS = {
       { from: "start", to: "extract" },
       { from: "extract", to: "validate" },
       { from: "validate", to: "valid" },
-      { from: "valid", fromSide: "left", to: "followup", label: "no", lx: 167, ly: 440 },
+      { from: "valid", fromSide: "left", to: "askUser", label: "no", lx: 167, ly: 440 },
       { from: "valid", to: "search", label: "yes", lx: 328, ly: 470 },
       { from: "search", to: "save" },
     ],
@@ -105,15 +105,14 @@ export const FLOWS = {
     nodes: {
       start: { x: 210, y: 20, w: 220, h: 40, kind: "pill", title: "Query + resume bytes?" },
       // route_after_input always returns resume_vision_parser unless the graph
-      // already errored or has a follow_up_question, which exits to END.
-      // This is the first of the two nodes that can ask the user something
-      // (graph.py:86 asks for a role when neither query nor resume is usable).
-      errIn: { x: 20, y: 100, w: 170, h: 100, kind: "diamond", dashed: true, title: "Error / follow-up?" },
+      // already errored or the request had nothing usable, which ends the run.
+      // input_analyzer raises this one when there is no query AND no resume.
+      errIn: { x: 20, y: 100, w: 170, h: 100, kind: "diamond", dashed: true, title: "Empty request?" },
       parse: { x: 210, y: 180, w: 220, h: 110, title: "Resume parser", tag: "LLM", lines: ["bytes → parse · none →", "load stored profile"] },
       query: { x: 210, y: 330, w: 220, h: 100, title: "Query analyzer", tag: "rule", lines: ["role · location ·", "work mode (typo → LLM)"] },
       build: { x: 210, y: 470, w: 220, h: 100, title: "Profile builder", tag: "rule", lines: ["merge resume + query", "into one profile"] },
       valid: { x: 210, y: 610, w: 220, h: 100, kind: "diamond", title: "Profile ok?" },
-      ask: { x: 20, y: 750, w: 170, h: 100, dashed: true, title: "Ask follow-up", lines: ["no role? no place?", "ends the run"] },
+      ask: { x: 20, y: 750, w: 170, h: 100, dashed: true, title: "Agent asks", lines: ["no role, or no place", "run stops"] },
       plan: { x: 210, y: 750, w: 220, h: 100, title: "Search planner", tag: "rule", lines: ["roles × locations =", "≤ 4 requests, 0 LLM"] },
       search: { x: 210, y: 890, w: 220, h: 100, title: "Google Jobs", tag: "API", lines: ["SerpApi ·", "normalise + dedupe"] },
       match: { x: 210, y: 1030, w: 220, h: 100, title: "Match + rank", tag: "rule", lines: ["skill overlap →", "freshest, 0% honest"] },
@@ -121,7 +120,7 @@ export const FLOWS = {
     },
     edges: [
       { from: "start", to: "errIn" },
-      { from: "errIn", fromSide: "left", to: "save", label: "stop", lx: 100, ly: 700 },
+      { from: "errIn", fromSide: "left", to: "save", label: "agent asks", lx: 78, ly: 700 },
       { from: "errIn", to: "parse" },
       { from: "parse", to: "query" },
       { from: "query", to: "build" },
@@ -149,7 +148,7 @@ export const FLOWS = {
           extract: { x: 220, y: 100, w: 200, h: 100, title: "Extract params", tag: "LLM", lines: ["origin · destination ·", "dates · cabin · pax"] },
           validate: { x: 220, y: 240, w: 200, h: 64, title: "Validate", tag: "rule", lines: ["origin + destination + date?"] },
           valid: { x: 220, y: 344, w: 200, h: 100, kind: "diamond", title: "Valid?" },
-          followup: { x: 30, y: 484, w: 170, h: 100, dashed: true, title: "Ask follow-up", lines: ["origin? destination?", "date?"] },
+          askUser: { x: 30, y: 484, w: 170, h: 100, dashed: true, title: "Agent asks", lines: ["needs route", "and a date"] },
           search: { x: 220, y: 484, w: 200, h: 100, title: "Search flights", tag: "API", lines: ["Google Flights ·", "normalize"] },
           save: { x: 170, y: 624, w: 300, h: 44, kind: "pill", dashed: true, title: "Save session", tag: "MongoDB" },
         },
@@ -157,7 +156,7 @@ export const FLOWS = {
           { from: "start", to: "extract" },
           { from: "extract", to: "validate" },
           { from: "validate", to: "valid" },
-          { from: "valid", fromSide: "left", to: "followup", label: "no", lx: 167, ly: 440 },
+          { from: "valid", fromSide: "left", to: "askUser", label: "no", lx: 167, ly: 440 },
           { from: "valid", to: "search", label: "yes", lx: 328, ly: 470 },
           { from: "search", to: "save" },
         ],
@@ -171,7 +170,7 @@ export const FLOWS = {
           extract: { x: 220, y: 100, w: 200, h: 100, title: "Extract params", tag: "LLM", lines: ["location · check-in/out ·", "guests · rooms"] },
           validate: { x: 220, y: 240, w: 200, h: 64, title: "Validate", tag: "rule", lines: ["location + dates?"] },
           valid: { x: 220, y: 344, w: 200, h: 100, kind: "diamond", title: "Valid?" },
-          followup: { x: 30, y: 484, w: 170, h: 100, dashed: true, title: "Ask follow-up", lines: ["location?", "check-in/out dates?"] },
+          askUser: { x: 30, y: 484, w: 170, h: 100, dashed: true, title: "Agent asks", lines: ["needs a place", "and dates"] },
           search: { x: 220, y: 484, w: 200, h: 100, title: "Search hotels", tag: "API", lines: ["Google Hotels ·", "budget filter"] },
           save: { x: 170, y: 624, w: 300, h: 44, kind: "pill", dashed: true, title: "Save session", tag: "MongoDB" },
         },
@@ -179,7 +178,7 @@ export const FLOWS = {
           { from: "start", to: "extract" },
           { from: "extract", to: "validate" },
           { from: "validate", to: "valid" },
-          { from: "valid", fromSide: "left", to: "followup", label: "no", lx: 167, ly: 440 },
+          { from: "valid", fromSide: "left", to: "askUser", label: "no", lx: 167, ly: 440 },
           { from: "valid", to: "search", label: "yes", lx: 328, ly: 470 },
           { from: "search", to: "save" },
         ],
@@ -189,8 +188,8 @@ export const FLOWS = {
         w: 640,
         h: 1790,
         nodes: {
-          start: { x: 230, y: 20, w: 180, h: 40, kind: "pill", title: "New / follow-up msg" },
-          extract: { x: 220, y: 100, w: 200, h: 100, title: "Extract params", tag: "LLM", lines: ["params + intent:", "new_trip / follow-up"] },
+          start: { x: 230, y: 20, w: 180, h: 40, kind: "pill", title: "First msg / revision" },
+          extract: { x: 220, y: 100, w: 200, h: 100, title: "Extract params", tag: "LLM", lines: ["params + intent:", "new trip or revision"] },
           pok: { x: 220, y: 240, w: 200, h: 100, kind: "diamond", title: "Params ok?" },
           validate: { x: 220, y: 380, w: 200, h: 100, title: "Validate", tag: "LLM", lines: ["clarifying questions", "if details missing"] },
           qd: { x: 220, y: 520, w: 200, h: 100, kind: "diamond", title: "Questions?" },
