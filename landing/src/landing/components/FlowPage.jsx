@@ -23,10 +23,18 @@ function FlowChart({ graph, accent }) {
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => {
+    const measure = () => {
       const r = el.getBoundingClientRect();
-      setBox({ w: r.width, h: r.height });
-    });
+      // The panel is padded, and getBoundingClientRect reports the border box,
+      // so scaling against it directly overflowed by the padding and left a
+      // stray scrollbar that clipped the last row.
+      const cs = getComputedStyle(el);
+      const padX = parseFloat(cs.paddingLeft || 0) + parseFloat(cs.paddingRight || 0);
+      const padY = parseFloat(cs.paddingTop || 0) + parseFloat(cs.paddingBottom || 0);
+      setBox({ w: Math.max(1, r.width - padX), h: Math.max(1, r.height - padY) });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
   }, []);

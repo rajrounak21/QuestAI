@@ -96,20 +96,24 @@ export const FLOWS = {
     title: "Jobs",
     subtitle: "Resume-matched job search — boxes are real nodes, arrows are real edges",
     accent: "#56d9a0",
-    // 8 nodes, 2 conditional branches, 2 LLM calls (resume parse + typo fix).
-    stats: ["8 graph nodes", "1 conditional branch", "2 LLM calls"],
+    stats: ["8 graph nodes", "1 conditional branch"],
     w: 640,
-    h: 1180,
+    // Must clear the last node: save sits at y 1160 with h 40, so the bottom
+    // edge is 1200. Anything under that clips the pill in the viewBox itself,
+    // which reads as "the bottom of the graph is hidden".
+    h: 1220,
     nodes: {
       start: { x: 210, y: 20, w: 220, h: 40, kind: "pill", title: "Query + resume bytes?" },
       // route_after_input always returns resume_vision_parser unless the graph
       // already errored or has a follow_up_question, which exits to END.
+      // This is the first of the two nodes that can ask the user something
+      // (graph.py:86 asks for a role when neither query nor resume is usable).
       errIn: { x: 20, y: 100, w: 170, h: 100, kind: "diamond", dashed: true, title: "Error / follow-up?" },
       parse: { x: 210, y: 180, w: 220, h: 110, title: "Resume parser", tag: "LLM", lines: ["bytes → parse · none →", "load stored profile"] },
       query: { x: 210, y: 330, w: 220, h: 100, title: "Query analyzer", tag: "rule", lines: ["role · location ·", "work mode (typo → LLM)"] },
       build: { x: 210, y: 470, w: 220, h: 100, title: "Profile builder", tag: "rule", lines: ["merge resume + query", "into one profile"] },
       valid: { x: 210, y: 610, w: 220, h: 100, kind: "diamond", title: "Profile ok?" },
-      ask: { x: 20, y: 750, w: 170, h: 100, dashed: true, title: "Ask follow-up", lines: ["missing roles →", "stop here"] },
+      ask: { x: 20, y: 750, w: 170, h: 100, dashed: true, title: "Ask follow-up", lines: ["no role? no place?", "ends the run"] },
       plan: { x: 210, y: 750, w: 220, h: 100, title: "Search planner", tag: "rule", lines: ["roles × locations =", "≤ 4 requests, 0 LLM"] },
       search: { x: 210, y: 890, w: 220, h: 100, title: "Google Jobs", tag: "API", lines: ["SerpApi ·", "normalise + dedupe"] },
       match: { x: 210, y: 1030, w: 220, h: 100, title: "Match + rank", tag: "rule", lines: ["skill overlap →", "freshest, 0% honest"] },
