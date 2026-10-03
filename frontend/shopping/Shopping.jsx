@@ -9,6 +9,7 @@ import EmptyState from "./components/EmptyState";
 import { shoppingApi, timeAgo, LOCATIONS, DEFAULT_LOCATION, locationLabel, currencySymbol, currencyLocale } from "./api";
 import { getToken } from "../auth/api";
 import { useRouterPrefill } from "../src/shared/useRouterPrefill";
+import RouteReceipt from "../src/shared/RouteReceipt";
 import "./Shopping.css";
 
 const DEFAULT_FILTERS = {
@@ -295,6 +296,7 @@ export default function Shopping() {
       </header>
 
       <main className="app-main">
+        {routerPrefill && <RouteReceipt prefill={routerPrefill} />}
     <ShoppingSearch
       onSearch={handleSearch}
       loading={loading}

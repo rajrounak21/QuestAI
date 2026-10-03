@@ -1,0 +1,59 @@
+/* One-line receipt shown on an agent page when the universal router filled the
+   form. Sits directly above the search card so the user reads what happened
+   before they touch anything. */
+
+.route-receipt {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.7rem;
+  max-width: var(--max, 1100px);
+  margin: 0 auto 0.6rem;
+  padding: 0.55rem 2rem 0.55rem 0.85rem;
+  position: relative;
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--accent);
+  border-radius: 10px;
+  background: var(--soft);
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.route-receipt-agent {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.route-receipt-part em {
+  font-style: normal;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.64rem;
+  color: var(--faint);
+  margin-right: 0.3rem;
+}
+
+.route-receipt-assumed em { color: var(--accent); }
+.route-receipt-missing em { color: #d98b3a; }
+
+.route-receipt-x {
+  position: absolute;
+  top: 50%;
+  right: 0.5rem;
+  transform: translateY(-50%);
+  border: 0;
+  background: none;
+  color: var(--faint);
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.15rem 0.35rem;
+  border-radius: 6px;
+}
+
+.route-receipt-x:hover { color: var(--text); }
+
+@media (max-width: 720px) {
+  .route-receipt { padding-right: 1.9rem; font-size: 0.78rem; }
+}

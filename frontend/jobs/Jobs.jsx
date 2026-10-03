@@ -4,6 +4,7 @@ import { SlidersHorizontal, Bell, LayoutGrid, User, X, Search, History, FolderOp
 import CollapsibleSection from "./CollapsibleSection";
 import { parseQuery } from "./parseQuery";
 import { useRouterPrefill } from "../src/shared/useRouterPrefill";
+import RouteReceipt from "../src/shared/RouteReceipt";
 import { mergeFields } from "../src/shared/mergeFields";
 import JobSearch from "./JobSearch";
 import JobCard from "./JobCard";
@@ -463,6 +464,7 @@ export default function Jobs() {
           open={searchOpen}
           onOpen={setSearchOpen}
         >
+          {routerPrefill && <RouteReceipt prefill={routerPrefill} />}
           <JobSearch
             onSearch={handleSearch}
             loading={loading}

@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { researchApi, timeAgo } from "./api";
 import { getToken } from "../auth/api";
 import { useRouterPrefill } from "../src/shared/useRouterPrefill";
+import RouteReceipt from "../src/shared/RouteReceipt";
 import { SendIcon } from "../auth/components/icons";
 import "./Research.css";
 
@@ -560,6 +561,7 @@ export default function Research() {
     <div className="rs">
       {/* report workspace */}
       <main className="rs-main">
+        {routerPrefill && <RouteReceipt prefill={routerPrefill} />}
         <header className="rs-top">
           <button className="rs-top-btn" onClick={() => setPanelOpen(true)} aria-label="Open sessions">
             <PanelSvg />

@@ -13,6 +13,7 @@ import HotelDetails from "../hotels/components/HotelDetails";
 import { tripsApi, timeAgo } from "./api";
 import { parseTripQuery } from "../shared/parseQuery";
 import { useRouterPrefill } from "../../src/shared/useRouterPrefill";
+import RouteReceipt from "../../src/shared/RouteReceipt";
 import { mergeFields } from "../../src/shared/mergeFields";
 import { getToken } from "../../auth/api";
 import ErrorBoundary from "../../src/shared/ErrorBoundary";
@@ -417,6 +418,7 @@ export default function Trips() {
 
       <main className="app-main">
         <PriceDisclaimer />
+        {routerPrefill && <RouteReceipt prefill={routerPrefill} />}
         <TripSearch onSearch={startPlan} loading={running} initialValues={prefillValues} autoRun={!!routerPrefill?.autoRun} />
 
         {loadingSession && (

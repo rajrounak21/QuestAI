@@ -8,6 +8,7 @@ import HotelFilters from "./components/HotelFilters";
 import { PriceDisclaimer, GuideButton } from "../../src/shared/TravelGuide";
 import { hotelsApi, timeAgo } from "./api";
 import { useRouterPrefill } from "../../src/shared/useRouterPrefill";
+import RouteReceipt from "../../src/shared/RouteReceipt";
 import { getToken } from "../../auth/api";
 import "./Hotels.css";
 // Styles shared with the flights and trips pages. Used to be a copy-paste of
@@ -232,6 +233,7 @@ export default function Hotels() {
 
       <main className="app-main">
         <PriceDisclaimer />
+        {routerPrefill && <RouteReceipt prefill={routerPrefill} />}
         <HotelSearch onSearch={handleSearch} loading={loading} initialQuery={prefillQuery} initialFields={prefillFields} autoRun={!!routerPrefill?.autoRun} />
         {loading && <p className="search-hint"><span className="dot-pulse" /> Searching live hotels…</p>}
 

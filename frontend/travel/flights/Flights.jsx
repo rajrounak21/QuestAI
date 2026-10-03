@@ -8,6 +8,7 @@ import FlightFilters from "./components/FlightFilters";
 import { PriceDisclaimer, GuideButton } from "../../src/shared/TravelGuide";
 import { flightsApi, timeAgo } from "./api";
 import { useRouterPrefill } from "../../src/shared/useRouterPrefill";
+import RouteReceipt from "../../src/shared/RouteReceipt";
 import { getToken } from "../../auth/api";
 // Styles shared with the hotels and trips pages. Flights.css is gone: it had no
 // rules of its own, every one of them lived in the other two stylesheets too.
@@ -247,6 +248,7 @@ export default function Flights() {
 
       <main className="app-main">
         <PriceDisclaimer />
+        {routerPrefill && <RouteReceipt prefill={routerPrefill} />}
         <FlightSearch onSearch={handleSearch} loading={loading} initialQuery={prefillQuery} initialFields={prefillFields} autoRun={!!routerPrefill?.autoRun} />
         {loading && <p className="search-hint"><span className="dot-pulse" /> Searching live flights…</p>}
 
