@@ -130,7 +130,7 @@ cd frontend && npm test
 | Variable | Required | Purpose |
 |---|---|---|
 | `SERP_API_KEY` | **yes** | The only search provider in the product |
-| `GROQ_API_KEY` | **yes** | Runs every LLM node |
+| `GROQ_API_KEY` | **yes** | Runs every LLM node, including resume-image parsing |
 | `MONGODB_URI` | **yes** | Users, sessions, job alerts |
 | `JWT_SECRET_KEY` | **yes** | Signs tokens — defaults to `""`, which is an empty HMAC secret, so set it |
 
@@ -138,6 +138,12 @@ Everything else has a working default. Optional groups: Google OAuth, SMTP
 (OTP delivery), and `N8N_SERVICE_KEY` (scheduled job alerts). Without SMTP the
 app runs but cannot deliver a signup code; without Google credentials the OAuth
 button stays hidden.
+
+There is only **one** Groq key — the same `GROQ_API_KEY` makes vision calls.
+`GROQ_VISION_MODELS` is not a credential; it is a comma-separated list of model
+IDs for the scanned-PDF resume path, and it ships **empty on purpose** because
+the models it previously used now return 404/400 on Groq. Leave it empty and Jobs
+falls back to text extraction, which handles normal text PDFs correctly.
 
 ---
 
