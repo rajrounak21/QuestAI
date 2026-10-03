@@ -22,6 +22,7 @@ from typing import Any
 
 from backend.agents.research.services.llm import init_llm_light, invoke_with_timeout
 from backend.agents.router.services.catalog import AGENTS, ASSISTANT
+from backend.agents.travel.services.currency import SUPPORTED, currency_for
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +89,9 @@ Rules:
     shopping: query
     research: query
     assistant: (none needed)
+- For trips, also report budget_currency: the ISO code the user wrote (INR for
+  ₹ / rs / rupees, USD for $, etc). Use "" if they wrote a bare number with no
+  symbol - a number alone says nothing about the currency.
 - Dates must be YYYY-MM-DD. If the user said a relative date and you are unsure
   of the exact day, use "".
 
@@ -130,6 +134,19 @@ def _summarise(value: Any) -> str:
     return str(value)
 
 
+def _trip_currency(fields: dict[str, Any]) -> str:
+    """Currency for a trip the user is about to hand over.
+
+    A bare "under 40000" says nothing about the currency, and assuming USD made a
+    rupee budget 83x too generous. So it comes from the origin city the user
+    actually named, unless the model picked a symbol out of the sentence.
+    """
+    stated = str(fields.get("budget_currency") or "").strip().upper()
+    if stated in SUPPORTED:
+        return stated
+    return currency_for(str(fields.get("origin") or ""))
+
+
 def build_receipt(agent: str, fields: dict[str, Any]) -> dict[str, Any]:
     """What the router understood, what it will assume, and what is still needed.
 
@@ -138,9 +155,12 @@ def build_receipt(agent: str, fields: dict[str, Any]) -> dict[str, Any]:
     """
     required = REQUIRED_FIELDS.get(agent, ())
     defaults = FORM_DEFAULTS.get(agent, {})
+    assumed = {k: v for k, v in defaults.items() if not fields.get(k)}
+    if agent == "trips":
+        assumed["budget_currency"] = _trip_currency(fields)
     return {
         "understood": {k: _summarise(v) for k, v in fields.items()},
-        "assumed": {k: v for k, v in defaults.items() if not fields.get(k)},
+        "assumed": assumed,
         "missing": [f for f in required if not fields.get(f)],
     }
 
@@ -184,6 +204,18 @@ def _strip_fences(text: str) -> str:
     return text.strip()
 
 
+_LEAD_NOISE = re.compile(
+    r"^\s*(?:please\s+)?(?:(?:find|search|book|show|get|plan|arrange|make|look\s+for)\s+)?(?:me\s+)?"
+    r"(?:a\s+)?(?:short|long|quick|weekend|holiday|vacation)?\s*"
+    r"(?:\d+[-\s]*(?:days?|nights?)\s*)?"
+    r"(?:trip|flights?|tickets?|hotels?|journey|travel)?\s*",
+    re.I,
+)
+# Only for the left-hand side. Including a bare "to" here ate the first two
+# letters of "Tokyo", because the destination is matched case-insensitively.
+_LEAD_ORIGIN = re.compile(rf"{_LEAD_NOISE.pattern}(?:from|between|to|in)?\s*", re.I)
+
+
 def _regex_fields(agent: str, q: str) -> dict[str, Any]:
     """Deterministic fallback extraction, used field-by-field when the LLM
     omits something. Mirrors the frontend travel parsers closely enough to be a
@@ -192,9 +224,23 @@ def _regex_fields(agent: str, q: str) -> dict[str, Any]:
         m = re.search(r"(.+?)\s+to\s+(.+)", q, re.I)
         out: dict[str, Any] = {}
         if m:
-            out["origin"] = m.group(1).strip()
-            out["destination"] = m.group(2).strip()
+            # Without this the origin came back as "plan a 5 day trip from
+            # Delhi", which then sat in the form as if the user had typed it.
+            out["origin"] = _LEAD_ORIGIN.sub("", m.group(1)).strip()
+            dest = _LEAD_NOISE.sub("", m.group(2)).strip()
+            # Trailing budget/date clauses are not part of the destination.
+            dest = re.split(r"\s+(?:under|below|up\s+to|budget|within|on)\s+", dest, maxsplit=1, flags=re.I)[0]
+            out["destination"] = dest.strip()
         out["departure_date"] = _iso_from(q)
+        if agent == "trips":
+            b = re.search(r"(?:budget|under|below|up\s+to|max|within)\s*(?:of\s*)?"
+                          r"(?:rs\.?|inr|₹|\$)?\s*([\d,.]+)\s*(k)?", q, re.I)
+            if b:
+                try:
+                    n = float(b.group(1).replace(",", ""))
+                    out["budget_max"] = n * 1000 if b.group(2) else n
+                except ValueError:
+                    pass
         return out
     if agent == "hotels":
         m = re.search(r"\b(?:in|at|near)\s+(.+?)(?:\s+from\b|\s+for\b|$)", q, re.I)

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Search, ArrowRight, Sparkles, MapPin } from "lucide-react";
+import { CURRENCIES } from "../../../src/shared/api";
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -14,6 +15,12 @@ export default function TripSearch({ onSearch, loading, initialValues, actions, 
   const [travelers, setTravelers] = useState(iv.travelers || 2);
   const [budget, setBudget] = useState(
     iv.budget?.max_total != null ? String(iv.budget.max_total) : ""
+  );
+  // Set by the router: an explicit symbol wins, otherwise it is derived from the
+  // origin city. Default INR matches the shopping location default. Either way it
+  // is visible in the dropdown, never inferred silently from the number.
+  const [currency, setCurrency] = useState(
+    iv.budget?.currency || iv.budget_currency || "INR"
   );
   const autoRunRef = useRef(false);
 
@@ -30,14 +37,18 @@ export default function TripSearch({ onSearch, loading, initialValues, actions, 
     if (iv.duration_days) setDuration(iv.duration_days);
     if (iv.travelers) setTravelers(iv.travelers);
     if (iv.budget?.max_total != null) setBudget(String(iv.budget.max_total));
+    if (iv.budget?.currency) setCurrency(iv.budget.currency);
+    if (iv.budget_currency) setCurrency(iv.budget_currency);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialValues]);
 
   const buildQuery = () => {
-    // Structured form -> single NL string for the LLM extract node. USD only.
+    // Structured form -> single NL string for the LLM extract node. The currency
+    // is stated explicitly: it used to append the literal word "dollars", so a
+    // rupee budget was read as a dollar budget downstream.
     return (
       `${duration}-day trip from ${origin.trim()} to ${destination.trim()} ` +
-      `departing ${departureDate} for ${travelers} people, budget ${Number(budget)} dollars`
+      `departing ${departureDate} for ${travelers} people, budget ${Number(budget)} ${currency}`
     );
   };
 
@@ -57,7 +68,7 @@ export default function TripSearch({ onSearch, loading, initialValues, actions, 
     autoRunRef.current = true;
     onSearch(buildQuery());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoRun, valid, loading, origin, destination, departureDate, duration, travelers, budget]);
+  }, [autoRun, valid, loading, origin, destination, departureDate, duration, travelers, budget, currency]);
 
   return (
     <div className="search-hero">
@@ -89,10 +100,18 @@ export default function TripSearch({ onSearch, loading, initialValues, actions, 
               onChange={(e) => setTravelers(parseInt(e.target.value) || 2)} className="fl-input" disabled={loading} />
           </label>
           <label className="fl-field">
-            <span>Budget (USD)</span>
-            <input type="number" min={100} value={budget}
-              onChange={(e) => setBudget(e.target.value)} placeholder="e.g. 2500"
-              className="fl-input" disabled={loading} required />
+            <span>Budget</span>
+            <span className="input-with-symbol">
+              {/* An explicit symbol in the query wins, then the origin city.
+                  Never guessed from the number itself - "40000" means nothing
+                  without a currency, and assuming one silently inflated it 83x. */}
+              <select value={currency} onChange={(e) => setCurrency(e.target.value)} className="fl-input" disabled={loading} aria-label="Budget currency">
+                {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <input type="number" min={100} value={budget}
+                onChange={(e) => setBudget(e.target.value)} placeholder="e.g. 2500"
+                className="fl-input" disabled={loading} required />
+            </span>
           </label>
         </div>
         <div className="search-row">

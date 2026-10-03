@@ -126,13 +126,22 @@ export function parseTripQuery(q) {
     }
   }
 
+  // The currency can sit before the number ("under ₹40000") or after it
+  // ("under 40000 INR"), so both sides are captured rather than assumed.
   const bm = s.match(
-    /(?:budget|under|below|up\s+to|max|within)\s*(?:of\s*)?(?:rs\.?|inr|₹|\$)?\s*([\d,.]+)\s*(k)?/i
+    /(?:budget|under|below|up\s+to|max|within)\s*(?:of\s*)?(?:(rs\.?|inr|₹|\$)\s*)?([\d,.]+)\s*(k)?\s*(inr|usd|gbp|aed|cad|aud|eur|sgd)?/i
   );
   if (bm) {
-    const n = parseFloat(bm[1].replace(/,/g, ''));
+    const n = parseFloat(bm[2].replace(/,/g, ''));
     if (Number.isFinite(n)) {
-      out.budget_max = bm[2] ? n * 1000 : n;
+      out.budget_max = bm[3] ? n * 1000 : n;
+      // Without this the budget arrives as a bare number and the trip form has to
+      // assume a currency the user never stated - which inflated a rupee budget
+      // 83x when it was read as dollars.
+      const sym = bm[1] || bm[4];
+      if (sym) {
+        out.budget_currency = /inr|₹|rs/i.test(sym) ? "INR" : sym.replace(/\$/i, "USD").toUpperCase();
+      }
       s = s.replace(bm[0], ' ');
     }
   }

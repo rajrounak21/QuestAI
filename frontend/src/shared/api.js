@@ -62,3 +62,8 @@ export function currencySymbol(code) {
 export function currencyLocale(code) {
   return code === "INR" ? "en-IN" : "en-US";
 }
+
+// The currencies a trip can be budgeted in - the same eight countries the
+// shopping location picker offers, so a trip never lands on a currency the rest
+// of the app cannot render. Derived from those presets rather than a second list.
+export const CURRENCIES = ["INR", "USD", "GBP", "AED", "CAD", "AUD", "EUR", "SGD"];
