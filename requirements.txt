@@ -1,6 +1,4 @@
 python-dotenv
-langchain
-langchain-community
 langchain-core
 langchain-groq
 langgraph
@@ -12,11 +10,8 @@ uvicorn[standard]
 pymupdf
 tzdata
 Pymongo
-PyJWT
-pwdlib[argon2]
 python-multipart
 authlib
-httpx
 bcrypt
 aiosmtplib
 itsdangerous
