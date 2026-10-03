@@ -139,11 +139,13 @@ Everything else has a working default. Optional groups: Google OAuth, SMTP
 app runs but cannot deliver a signup code; without Google credentials the OAuth
 button stays hidden.
 
-One Groq key covers everything, including resume parsing. Resume upload works off
-the PDF's text layer, so a normal text-based PDF parses fine; a *scanned* PDF
-(image-only, no text) has nothing to read and returns a 422 asking for a
-text-based one. There is no image-model path — the Groq account this was built
-against exposes no vision-capable model.
+There is only **one** Groq key — the same `GROQ_API_KEY` makes the vision calls,
+so there is no separate vision credential to configure. Resume upload reads the
+PDF's text layer first, which handles normal text-based PDFs. A *scanned* PDF has
+no text layer, so those pages are rendered to PNG and read by
+`qwen/qwen3.8-27b` — vision-capable, and the only such model on this key, though
+"vision" appears nowhere in its name. `GROQ_VISION_MODELS` can override that model
+or add a fallback chain, but nothing needs to set it.
 
 ---
 
