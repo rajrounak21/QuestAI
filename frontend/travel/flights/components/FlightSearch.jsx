@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Search, ArrowRight, Sparkles, Plane } from "lucide-react";
 import { parseFlightQuery } from "../../shared/parseQuery";
 import { mergeFields } from "../../../src/shared/mergeFields";
@@ -20,6 +20,7 @@ export default function FlightSearch({ onSearch, loading, initialQuery = "", ini
   const [returnDate, setReturnDate] = useState("");
   const [passengers, setPassengers] = useState(1);
   const [cabin, setCabin] = useState("economy");
+  const autoRunRef = useRef(false);
 
   // A question handed over from the dashboard (/flights?q=...) fills the form.
   // The router and the text parser are merged per field, so a date the router
@@ -48,6 +49,19 @@ export default function FlightSearch({ onSearch, loading, initialQuery = "", ini
   };
 
   const valid = origin.trim() && destination.trim() && departureDate;
+
+  // The router hands over with autoRun only when it had origin, destination AND
+  // departure_date. This effect runs after the prefill effect has settled the
+  // state, so `valid` is finally truthful - and it is the same expression the
+  // Search button uses, so the search can never fire on a form the user would
+  // have found unsubmittable. A missing date simply means this never fires and
+  // the user picks it.
+  useEffect(() => {
+    if (!autoRun || autoRunRef.current || loading) return;
+    if (!valid) return;
+    autoRunRef.current = true;
+    onSearch(buildQuery());
+  }, [autoRun, valid, loading, origin, destination, departureDate, returnDate, passengers, cabin, onSearch]);
 
   const handleSubmit = (e) => {
     e.preventDefault();

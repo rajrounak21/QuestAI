@@ -484,16 +484,20 @@ export default function Research() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
-  // ?q= from the dashboard only PREFILLS the ask box. It used to call submit(q)
-  // here, which started a research run on arrival. handleTipClick is the same
-  // prefill-only path the empty-state tip cards already use.
+  // ?q= from the dashboard hands the question over. When the router had every
+  // field it needed, autoRun starts the run itself — the query is the only
+  // required field, so there is nothing to ask. Otherwise it only pre-fills, the
+  // same path the empty-state tip cards use. The param is stripped either way so
+  // a refresh can't re-fire over the user's edits.
   useEffect(() => {
     const q = searchParams.get("q");
     if (!q || autoRunRef.current || sessionId) return;
     autoRunRef.current = true;
     setSearchParams({}, { replace: true });
     // The router's extracted query is cleaner than the raw sentence.
-    handleTipClick(routerPrefill?.fields?.query || q);
+    const query = routerPrefill?.fields?.query || q;
+    if (routerPrefill?.autoRun) submit(query);
+    else handleTipClick(query);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, sessionId]);
 

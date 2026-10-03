@@ -417,7 +417,7 @@ export default function Trips() {
 
       <main className="app-main">
         <PriceDisclaimer />
-        <TripSearch onSearch={startPlan} loading={running} initialValues={prefillValues} />
+        <TripSearch onSearch={startPlan} loading={running} initialValues={prefillValues} autoRun={!!routerPrefill?.autoRun} />
 
         {loadingSession && (
           <div className="trip-loading" role="status" aria-live="polite">

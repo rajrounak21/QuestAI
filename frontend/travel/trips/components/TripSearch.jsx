@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Search, ArrowRight, Sparkles, MapPin } from "lucide-react";
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
-export default function TripSearch({ onSearch, loading, initialValues, actions }) {
+export default function TripSearch({ onSearch, loading, initialValues, actions, autoRun = false }) {
   const iv = initialValues || {};
   const [origin, setOrigin] = useState(iv.origin || "");
   const [destination, setDestination] = useState(iv.destination || "");
@@ -15,12 +15,13 @@ export default function TripSearch({ onSearch, loading, initialValues, actions }
   const [budget, setBudget] = useState(
     iv.budget?.max_total != null ? String(iv.budget.max_total) : ""
   );
+  const autoRunRef = useRef(false);
 
   const valid = origin.trim() && destination.trim() && departureDate && Number(budget) >= 100;
 
   // initialValues is also read into state on mount, but a question handed over
   // from the dashboard (/trips?q=...) arrives after mount, so re-apply whenever
-  // it changes. Fills the form only — the user still presses Search.
+  // it changes.
   useEffect(() => {
     if (!iv.origin && !iv.destination && !iv.departure_date) return;
     if (iv.origin) setOrigin(iv.origin);
@@ -45,6 +46,18 @@ export default function TripSearch({ onSearch, loading, initialValues, actions }
     if (!valid || loading) return;
     onSearch(buildQuery(), actionId);
   };
+
+  // The trip planner is the most expensive run in the app, so autoRun only fires
+  // on the same `valid` the Search button requires - a real date and a real
+  // budget. Anything less and the user decides. Declared last so it observes
+  // state the two effects above have already settled.
+  useEffect(() => {
+    if (!autoRun || autoRunRef.current || loading) return;
+    if (!valid) return;
+    autoRunRef.current = true;
+    onSearch(buildQuery());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRun, valid, loading, origin, destination, departureDate, duration, travelers, budget]);
 
   return (
     <div className="search-hero">

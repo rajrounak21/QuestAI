@@ -232,7 +232,7 @@ export default function Hotels() {
 
       <main className="app-main">
         <PriceDisclaimer />
-        <HotelSearch onSearch={handleSearch} loading={loading} initialQuery={prefillQuery} initialFields={prefillFields} />
+        <HotelSearch onSearch={handleSearch} loading={loading} initialQuery={prefillQuery} initialFields={prefillFields} autoRun={!!routerPrefill?.autoRun} />
         {loading && <p className="search-hint"><span className="dot-pulse" /> Searching live hotels…</p>}
 
         {sessionId && (

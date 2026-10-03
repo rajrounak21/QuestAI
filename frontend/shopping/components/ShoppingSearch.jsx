@@ -3,15 +3,26 @@ import { Search, ArrowRight, Sparkles, MapPin } from 'lucide-react';
 
 const suggestions = ['iPhone 15', 'Samsung S22', 'Nike shoes', 'Wireless headphones', 'MacBook Air'];
 
-export default function ShoppingSearch({ onSearch, loading, locations, location, onLocationChange, locationLabel, initialQuery = '' }) {
+export default function ShoppingSearch({ onSearch, loading, locations, location, onLocationChange, locationLabel, initialQuery = '', autoRun = false }) {
   const [query, setQuery] = useState(initialQuery);
   const inputRef = useRef(null);
+  const autoRunRef = useRef(false);
 
   // A question handed over from the dashboard (/shopping?q=...) lands here as
-  // text only. It must never search on its own — the user presses Search.
+  // text. When the router already had everything it needed, autoRun runs the
+  // search itself - the query is the only required field, so there is nothing
+  // left to ask. Ref-guarded so it fires once, not on every render.
   useEffect(() => {
     if (initialQuery) setQuery(initialQuery);
   }, [initialQuery]);
+
+  useEffect(() => {
+    if (!autoRun || autoRunRef.current || loading) return;
+    const q = (query || initialQuery || '').trim();
+    if (!q) return;
+    autoRunRef.current = true;
+    onSearch(q);
+  }, [autoRun, query, initialQuery, loading, onSearch]);
 
   const handleSubmit = (e) => {
     e.preventDefault();

@@ -247,7 +247,7 @@ export default function Flights() {
 
       <main className="app-main">
         <PriceDisclaimer />
-        <FlightSearch onSearch={handleSearch} loading={loading} initialQuery={prefillQuery} initialFields={prefillFields} />
+        <FlightSearch onSearch={handleSearch} loading={loading} initialQuery={prefillQuery} initialFields={prefillFields} autoRun={!!routerPrefill?.autoRun} />
         {loading && <p className="search-hint"><span className="dot-pulse" /> Searching live flights…</p>}
 
         {sessionId && (

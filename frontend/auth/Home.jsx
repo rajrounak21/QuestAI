@@ -294,8 +294,24 @@ export default function Home() {
         // `state` (not the URL) carries the pre-extracted fields. It dies with
         // the navigation, so a refresh falls back to the page's own parser
         // instead of re-applying stale values.
+        //
+        // autoRun fires only when the router has every required field. Anything
+        // missing comes back as `receipt.missing`, and the form stays idle so it
+        // can ask rather than guess. That is the whole difference between an
+        // agent and a redirect.
+        const missing = d.receipt?.missing || [];
         navigate(`${d.path}?q=${encodeURIComponent(q)}`, {
-          state: { prefill: { agent: d.agent, query: q, fields: d.fields || {} } },
+          state: {
+            prefill: {
+              agent: d.agent,
+              query: q,
+              fields: d.fields || {},
+              receipt: d.receipt || null,
+              reason: d.reason || "",
+              confidence: typeof d.confidence === "number" ? d.confidence : null,
+              autoRun: missing.length === 0,
+            },
+          },
         });
       })
       .catch((err) => {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Search, ArrowRight, Sparkles, Building2 } from "lucide-react";
 import { parseHotelQuery } from "../../shared/parseQuery";
 import { mergeFields } from "../../../src/shared/mergeFields";
@@ -14,6 +14,7 @@ export default function HotelSearch({ onSearch, loading, initialQuery = "", init
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
   const [guests, setGuests] = useState(2);
+  const autoRunRef = useRef(false);
 
   // A question handed over from the dashboard (/hotels?q=...) fills the form.
   // Merged per field, so dates the router dropped still come from the parser.
@@ -34,6 +35,17 @@ export default function HotelSearch({ onSearch, loading, initialQuery = "", init
     // Structured form -> single NL string for the LLM extract node.
     return `Find hotels in ${location.trim()} from ${checkIn} to ${checkOut} for ${guests} guests`;
   };
+
+  // Fires only once the form is genuinely submittable - same `valid` the Search
+  // button uses. The router sets autoRun only when it had location and both
+  // dates, so a missing date lands the user here with the button disabled and
+  // nothing spent.
+  useEffect(() => {
+    if (!autoRun || autoRunRef.current || loading) return;
+    if (!valid) return;
+    autoRunRef.current = true;
+    onSearch(buildQuery());
+  }, [autoRun, valid, loading, location, checkIn, checkOut, guests, onSearch]);
 
   const handleSubmit = (e) => {
     e.preventDefault();

@@ -303,6 +303,7 @@ export default function Shopping() {
           location={location}
           onLocationChange={changeLocation}
           locationLabel={locationLabel(location)}
+          autoRun={!!routerPrefill?.autoRun}
         />
         <SearchProgress loading={loading} locationLabel={locationLabel(location)} />
 
