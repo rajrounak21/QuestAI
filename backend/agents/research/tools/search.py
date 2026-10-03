@@ -1,17 +1,7 @@
-# SerpAPI response shapes verified against live calls - see tools/verify_parsers.py
-# (run `python -m backend.agents.research.tools.verify_parsers`).
-#
-# Three shape facts that are easy to get wrong, all confirmed by that script:
-#  - google: organic_results[] carry title/link/snippet/date. date is a human
-#    string like "Sep 23, 2025", not ISO.
-#  - google_scholar: organic_results[] carry title/link/snippet plus
-#    publication_info, but publication_info has only {authors, summary} - there
-#    is NO "year" key. The year is only present inside the citation "summary"
-#    string, in the form "Authors - Journal, 2020 - publisher".
-#  - google_news: news_results[] carry title/link/date/iso_date/source, and NO
-#    "snippet" key at all. SerpApi does not return article body text for this
-#    engine. process_sources() drops sources whose snippet is empty, so leaving
-#    this blank silently threw away every news result - see _news_snippet.
+# Shapes verified against live responses - see verify_parsers.py.
+#  - google_news returns no snippet key; _news_snippet builds provenance instead,
+#    because process_sources() drops sources with an empty snippet.
+#  - google_scholar has no year key in publication_info; see _year_from_citation.
 from __future__ import annotations
 
 import logging
@@ -77,13 +67,8 @@ def google_search(query: str, num_results: int = 10) -> list[SearchResult]:
 
 
 def _year_from_citation(pub: dict[str, Any]) -> str:
-    """Pull the publication year out of publication_info.
-
-    Live SerpApi responses put only {authors, summary} in publication_info - no
-    "year" key. The year appears inside the citation summary, so try the
-    canonical "... , 2020 - publisher" position first and fall back to any
-    four-digit year in the string.
-    """
+    """publication_info is only {authors, summary}; the year is inside summary
+    as "..., 2020 - publisher"."""
     m = _YEAR_IN_CITATION.search(pub.get("summary", "") or "")
     if m:
         return m.group(1)
@@ -115,14 +100,8 @@ def google_scholar(query: str, num_results: int = 10) -> list[SearchResult]:
 
 
 def _news_snippet(r: dict[str, Any]) -> str:
-    """Provenance line for a news hit.
-
-    The google_news engine returns no article text, so there is nothing to
-    quote. Rather than leave the snippet empty - which process_sources() treats
-    as unusable and drops, losing the result entirely - build the one piece of
-    real text the payload does carry: who published it and who wrote it.
-    No text is ever invented here.
-    """
+    """google_news returns no article text, so use the provenance it does carry.
+    Never invents text."""
     src = r.get("source") or {}
     if isinstance(src, str):
         return src
@@ -147,9 +126,6 @@ def google_news(query: str, num_results: int = 10) -> list[SearchResult]:
                 url=r.get("link", ""),
                 snippet=_news_snippet(r),
                 source_type=SourceType.NEWS,
-                # iso_date is present and machine-parseable ("2026-10-02T19:58:00Z")
-                # while date is a verbose local string. Prefer iso for freshness
-                # reasoning downstream, fall back to date if a response omits it.
                 date=r.get("iso_date", "") or r.get("date", ""),
                 raw_data=r,
             ))

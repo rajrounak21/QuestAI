@@ -1,8 +1,10 @@
-"""Verify the research SerpApi tools against live responses, then print exactly
-what each engine's real payload looks like so the parsers can be checked.
+"""Check the research parsers against live SerpApi responses.
 
-Run once. Costs 3 SerpApi searches.
     python -m backend.agents.research.tools.verify_parsers
+
+Costs 3 searches. The process_sources() check is the important one: it drops
+sources with an empty snippet, so a parser can look perfect while contributing
+nothing.
 """
 
 from __future__ import annotations
@@ -10,6 +12,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
 
 from dotenv import load_dotenv
 
@@ -60,17 +63,33 @@ print("=" * 78)
 print("PARSER OUTPUT - through the real SearchResult dataclasses")
 print("=" * 78)
 
-failures = []
-
-for fn, stype, label in (
+ENGINES = (
     (google_search, SourceType.GOOGLE, "google"),
     (google_scholar, SourceType.SCHOLAR, "google_scholar"),
     (google_news, SourceType.NEWS, "google_news"),
-):
-    out = fn("retrieval augmented generation evaluation", num_results=3)
+)
+
+# The three engines swallow exceptions and return [], so an empty result can mean
+# a dropped connection rather than a broken parser. SerpApi resets connections
+# often enough to matter, so retry once before calling it a parser bug.
+def fetch(fn):
+    for attempt in (1, 2):
+        out = fn("retrieval augmented generation evaluation", num_results=3)
+        if out:
+            return out
+        if attempt == 1:
+            print("  (empty - retrying once; a reset connection looks the same as a broken parser)")
+            time.sleep(3)
+    return []
+
+
+failures = []
+
+for fn, stype, label in ENGINES:
+    out = fetch(fn)
     print(f"\n--- {label} -> {len(out)} SearchResult ---")
     if not out:
-        failures.append(f"{label}: parser returned 0 results")
+        failures.append(f"{label}: no results after 2 attempts - check the API key and connection")
         continue
     for s in out:
         missing = [f for f in ("title", "url") if not getattr(s, f)]
@@ -85,21 +104,19 @@ for fn, stype, label in (
 
 print()
 print("=" * 78)
-print("DOWNSTREAM - process_sources() drops any source with an empty snippet,")
-print("so an engine that yields blank snippets is silently a no-op. Checked here.")
+print("DOWNSTREAM - process_sources() drops empty snippets")
 print("=" * 78)
 
-for fn, label in ((google_search, "google"), (google_scholar, "google_scholar"), (google_news, "google_news")):
-    raw = fn("retrieval augmented generation evaluation", num_results=3)
+for fn, _, label in ENGINES:
+    raw = fetch(fn)
     kept = process_sources(list(raw))
     blank = sum(1 for s in raw if not s.snippet.strip())
     status = "OK " if kept else "DEAD"
     print(f"  [{status}] {label:15} fetched={len(raw)}  blank_snippets={blank}  survive_processing={len(kept)}")
     if raw and not kept:
-        failures.append(
-            f"{label}: {len(raw)} results fetched but process_sources() kept 0 "
-            f"(all snippets blank) - this engine contributes nothing downstream"
-        )
+        failures.append(f"{label}: fetched {len(raw)} but process_sources() kept 0")
+    if not raw:
+        failures.append(f"{label}: no results after 2 attempts - check the API key and connection")
 
 print()
 print("=" * 78)
@@ -108,5 +125,4 @@ if failures:
     for f in failures:
         print("  -", f)
     sys.exit(1)
-print("PASS - all three engines parse into populated SearchResult objects")
-print("       and every engine survives process_sources() with at least 1 source")
+print("PASS - every engine parses into populated SearchResults and survives process_sources()")

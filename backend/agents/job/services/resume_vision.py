@@ -13,27 +13,9 @@ load_dotenv(override=True)
 
 logger = logging.getLogger(__name__)
 
-# Vision models for the scanned-PDF fallback, tried in order.
-#
-# Defaults to qwen/qwen3.8-27b, which reads text off a rendered page correctly —
-# verified by sending it a real page image and getting the skills back. It is the
-# only vision-capable model on this Groq key, and "vision" appears nowhere in its
-# name, so do not go looking for a llama-4 or llava id here.
-#
-# The ids that used to be hardcoded are dead on Groq, which is why this was empty
-# for a while and every scanned PDF burned three failing round trips:
-#   meta-llama/llama-4-maverick-17b-128e-instruct -> 404 does not exist
-#   meta-llama/llama-4-scout-17b-16e-instruct     -> 404 does not exist
-#   llama-3.2-11b-vision-preview                  -> 400 decommissioned
-#
-# Override with GROQ_VISION_MODELS only if you want a different model or a
-# fallback chain. There is no separate vision key: authentication uses the same
-# GROQ_API_KEY as every other LLM call in this project.
-VISION_MODELS = [
-    m.strip()
-    for m in (os.getenv("GROQ_VISION_MODELS") or "qwen/qwen3.8-27b").split(",")
-    if m.strip()
-]
+# Only vision-capable model on this Groq key; "vision" is not in its name.
+# Auth is GROQ_API_KEY like every other call - nothing to configure.
+VISION_MODELS = ["qwen/qwen3.8-27b"]
 
 RESUME_VISION_PROMPT = """You are a resume parser. Extract structured information from this resume image.
 
@@ -317,12 +299,9 @@ def parse_resume_pdf(pdf_bytes: bytes) -> dict[str, Any]:
             "preferences": [],
         }
 
-    # Scanned PDF (too little text to structure). Vision is the only way forward,
-    # but this account has no vision model, so say so instead of burning three
-    # failing round trips. The caller turns the empty skills into a 4xx that
-    # tells the user to use a text-based PDF.
+    # Guard: without a model this would render pages and call nothing.
     if not VISION_MODELS:
-        logger.info("Scanned PDF and no GROQ_VISION_MODELS configured; text path only.")
+        logger.info("Scanned PDF but no vision model configured.")
         return {
             "raw_text": quick_text,
             "target_roles": [],

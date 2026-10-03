@@ -139,13 +139,9 @@ Everything else has a working default. Optional groups: Google OAuth, SMTP
 app runs but cannot deliver a signup code; without Google credentials the OAuth
 button stays hidden.
 
-There is only **one** Groq key — the same `GROQ_API_KEY` makes the vision calls,
-so there is no separate vision credential to configure. Resume upload reads the
-PDF's text layer first, which handles normal text-based PDFs. A *scanned* PDF has
-no text layer, so those pages are rendered to PNG and read by
-`qwen/qwen3.8-27b` — vision-capable, and the only such model on this key, though
-"vision" appears nowhere in its name. `GROQ_VISION_MODELS` can override that model
-or add a fallback chain, but nothing needs to set it.
+One Groq key covers everything, vision included. Resume upload reads the PDF text
+layer first; a scanned PDF has none, so its pages are rendered to PNG and read by
+`qwen/qwen3.8-27b`, hardcoded.
 
 ---
 
