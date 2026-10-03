@@ -155,14 +155,32 @@ def build_receipt(agent: str, fields: dict[str, Any]) -> dict[str, Any]:
     """
     required = REQUIRED_FIELDS.get(agent, ())
     defaults = FORM_DEFAULTS.get(agent, {})
-    assumed = {k: v for k, v in defaults.items() if not fields.get(k)}
-    if agent == "trips":
-        assumed["budget_currency"] = _trip_currency(fields)
     return {
         "understood": {k: _summarise(v) for k, v in fields.items()},
-        "assumed": assumed,
+        "assumed": {k: v for k, v in defaults.items() if not fields.get(k)},
         "missing": [f for f in required if not fields.get(f)],
     }
+
+
+def _finalise(agent: str, fields: dict[str, Any]) -> dict[str, Any]:
+    """Resolve the trip currency, then build the receipt. One place, because
+    every return path needs both.
+
+    The derived currency has to land in `fields` as well as the receipt: the trip
+    form reads fields.budget_currency, so reporting it only in the receipt left
+    the dropdown on its INR default while the router had decided GBP. It is also
+    kept in `assumed` so a derivation is still visible rather than silent.
+    """
+    derived: str | None = None
+    if agent == "trips":
+        stated = str(fields.get("budget_currency") or "").strip().upper()
+        fields["budget_currency"] = _trip_currency(fields)
+        derived = None if stated in SUPPORTED else fields["budget_currency"]
+
+    receipt = build_receipt(agent, fields)
+    if derived:
+        receipt["assumed"]["budget_currency"] = derived
+    return {"fields": fields, "receipt": receipt}
 
 
 def _iso_from(text: str) -> str:
@@ -233,14 +251,24 @@ def _regex_fields(agent: str, q: str) -> dict[str, Any]:
             out["destination"] = dest.strip()
         out["departure_date"] = _iso_from(q)
         if agent == "trips":
+            # Same shape as the frontend parser: the currency can sit on either
+            # side of the number. Capturing only the amount meant an explicit
+            # "3000 INR" fell back to the origin's currency whenever this path ran.
             b = re.search(r"(?:budget|under|below|up\s+to|max|within)\s*(?:of\s*)?"
-                          r"(?:rs\.?|inr|₹|\$)?\s*([\d,.]+)\s*(k)?", q, re.I)
+                          r"(?:(rs\.?|inr|₹|\$)\s*)?([\d,.]+)\s*(k)?\s*"
+                          r"(inr|usd|gbp|aed|cad|aud|eur|sgd)?", q, re.I)
             if b:
                 try:
-                    n = float(b.group(1).replace(",", ""))
-                    out["budget_max"] = n * 1000 if b.group(2) else n
+                    n = float(b.group(2).replace(",", ""))
+                    out["budget_max"] = n * 1000 if b.group(3) else n
                 except ValueError:
                     pass
+                sym = b.group(1) or b.group(4)
+                if sym:
+                    out["budget_currency"] = (
+                        "INR" if re.search(r"inr|₹|rs", sym, re.I)
+                        else sym.replace("$", "USD").upper()
+                    )
         return out
     if agent == "hotels":
         m = re.search(r"\b(?:in|at|near)\s+(.+?)(?:\s+from\b|\s+for\b|$)", q, re.I)
@@ -302,8 +330,7 @@ def _clean_payload(agent: str, data: dict[str, Any], q: str) -> dict[str, Any]:
         "agent": agent,
         "reason": str(data.get("reason", ""))[:80],
         "confidence": max(0.0, min(1.0, conf)),
-        "fields": fields,
-        "receipt": build_receipt(agent, fields),
+        **_finalise(agent, fields),
     }
 
 
@@ -313,8 +340,7 @@ def _payload(agent: str, reason: str, confidence: float, fields: dict[str, Any])
         "agent": agent,
         "reason": reason,
         "confidence": confidence,
-        "fields": fields,
-        "receipt": build_receipt(agent, fields),
+        **_finalise(agent, fields),
     }
 
 
