@@ -13,6 +13,7 @@ import HotelDetails from "../hotels/components/HotelDetails";
 import { tripsApi, timeAgo } from "./api";
 import { parseTripQuery } from "../shared/parseQuery";
 import { useRouterPrefill } from "../../src/shared/useRouterPrefill";
+import { mergeFields } from "../../src/shared/mergeFields";
 import { getToken } from "../../auth/api";
 import ErrorBoundary from "../../src/shared/ErrorBoundary";
 import { PriceDisclaimer, GuideButton } from "../../src/shared/TravelGuide";
@@ -265,15 +266,15 @@ export default function Trips() {
     if (!q || autoRunRef.current || sessionId) return;
     autoRunRef.current = true;
     setSearchParams({}, { replace: true });
-    // TripSearch reads budget as { budget: { max_total } }; the router returns
-    // it flat as budget_max, so reshape it. Router fields win over the parser.
-    const f = routerPrefill?.fields || {};
-    const merged = { ...(parseTripQuery(q) || {}), ...f };
-    if (merged.budget_max != null) {
-      merged.budget = { ...(merged.budget || {}), max_total: Number(merged.budget_max) };
-      delete merged.budget_max;
+    // Merged per field so a value the router dropped still comes from the parser.
+    // Router wins where it has one. TripSearch reads budget as
+    // { budget: { max_total } } while the router returns it flat, so reshape.
+    const f = mergeFields(routerPrefill?.fields, parseTripQuery(q));
+    if (f.budget_max != null) {
+      f.budget = { ...(f.budget || {}), max_total: Number(f.budget_max) };
+      delete f.budget_max;
     }
-    setPrefillValues(merged);
+    setPrefillValues(f);
     setDoc(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, sessionId]);

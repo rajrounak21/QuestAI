@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Search, ArrowRight, Sparkles, Plane } from "lucide-react";
 import { parseFlightQuery } from "../../shared/parseQuery";
+import { mergeFields } from "../../../src/shared/mergeFields";
 
 const suggestions = [
   "Delhi to Dubai",
@@ -12,7 +13,7 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
-export default function FlightSearch({ onSearch, loading, initialQuery = "", initialFields = null }) {
+export default function FlightSearch({ onSearch, loading, initialQuery = "", initialFields = null, autoRun = false }) {
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
   const [departureDate, setDepartureDate] = useState("");
@@ -20,15 +21,15 @@ export default function FlightSearch({ onSearch, loading, initialQuery = "", ini
   const [passengers, setPassengers] = useState(1);
   const [cabin, setCabin] = useState("economy");
 
-  // A question handed over from the dashboard (/flights?q=...) fills the form
-  // and nothing more. Fields the universal router already extracted win; any
-  // field it left out is filled by the text parser. Dates it could not find
-  // stay blank on purpose — the Search button stays disabled until the user
-  // picks them, which is safer than guessing a date and running a search
-  // nobody asked for.
+  // A question handed over from the dashboard (/flights?q=...) fills the form.
+  // The router and the text parser are merged per field, so a date the router
+  // dropped is still recovered from the same sentence. A date neither of them
+  // found stays blank on purpose — Search stays disabled until the user picks
+  // it, which is safer than guessing a date and running a search nobody asked
+  // for.
   useEffect(() => {
     if (!initialQuery && !initialFields) return;
-    const p = initialFields || parseFlightQuery(initialQuery) || {};
+    const p = mergeFields(initialFields, parseFlightQuery(initialQuery));
     if (p.origin) setOrigin(p.origin);
     if (p.destination) setDestination(p.destination);
     if (p.departure_date) setDepartureDate(p.departure_date);

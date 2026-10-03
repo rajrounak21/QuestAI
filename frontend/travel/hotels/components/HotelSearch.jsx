@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Search, ArrowRight, Sparkles, Building2 } from "lucide-react";
 import { parseHotelQuery } from "../../shared/parseQuery";
+import { mergeFields } from "../../../src/shared/mergeFields";
 
 const suggestions = ["Dubai", "Bali", "London"];
 
@@ -8,20 +9,19 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
-export default function HotelSearch({ onSearch, loading, initialQuery = "", initialFields = null }) {
+export default function HotelSearch({ onSearch, loading, initialQuery = "", initialFields = null, autoRun = false }) {
   const [location, setLocation] = useState("");
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
   const [guests, setGuests] = useState(2);
 
-  // A question handed over from the dashboard (/hotels?q=...) fills the form and
-  // nothing more. Fields the universal router already extracted win; anything it
-  // left out is filled by the text parser. Dates it could not find stay blank
-  // on purpose — the Search button stays disabled until the user picks them,
-  // rather than guessing a date and running a search nobody asked for.
+  // A question handed over from the dashboard (/hotels?q=...) fills the form.
+  // Merged per field, so dates the router dropped still come from the parser.
+  // Dates neither found stay blank on purpose - Search stays disabled until the
+  // user picks them rather than guessing a date nobody asked for.
   useEffect(() => {
     if (!initialQuery && !initialFields) return;
-    const p = initialFields || parseHotelQuery(initialQuery) || {};
+    const p = mergeFields(initialFields, parseHotelQuery(initialQuery));
     if (p.location) setLocation(p.location);
     if (p.check_in) setCheckIn(p.check_in);
     if (p.check_out) setCheckOut(p.check_out);

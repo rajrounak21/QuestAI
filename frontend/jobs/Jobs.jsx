@@ -4,6 +4,7 @@ import { SlidersHorizontal, Bell, LayoutGrid, User, X, Search, History, FolderOp
 import CollapsibleSection from "./CollapsibleSection";
 import { parseQuery } from "./parseQuery";
 import { useRouterPrefill } from "../src/shared/useRouterPrefill";
+import { mergeFields } from "../src/shared/mergeFields";
 import JobSearch from "./JobSearch";
 import JobCard from "./JobCard";
 import JobDetails from "./JobDetails";
@@ -336,17 +337,15 @@ export default function Jobs() {
     if (!q || autoRunRef.current || urlSessionId) return;
     autoRunRef.current = true;
     setSearchParams({}, { replace: true });
-    // Parse it the same way the "Try" chips are parsed, so the role, the
-    // location and the work mode all land in the right fields.
-    const parsed = parseQuery(q);
-    // Fields the universal router already extracted win over the text parse.
-    const f = routerPrefill?.fields || {};
-    const roles = f.roles?.length ? f.roles : parsed.role ? [parsed.role] : [];
-    const locations = f.locations?.length ? f.locations : parsed.locations;
-    const mode = f.work_mode || parsed.mode || "";
+    // Merged per field: the router wins where it has a value, the text parser
+    // fills the rest. mergeFields also maps the parser's role -> roles and
+    // mode -> work_mode, so both sources land on the same names.
+    const f = mergeFields(routerPrefill?.fields, parseQuery(q));
+    const roles = Array.isArray(f.roles) ? f.roles : f.roles ? [f.roles] : [];
+    const locations = Array.isArray(f.locations) ? f.locations : [];
     setPrefillRoles(roles);
     setPrefillLocations(locations);
-    setPrefillWorkMode(mode);
+    setPrefillWorkMode(f.work_mode || "");
     setJobs([]);
     setTotal(0);
     setHasSearched(false);
