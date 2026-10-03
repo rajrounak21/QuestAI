@@ -30,7 +30,7 @@ Return ONLY a JSON object (no markdown, no explanation):
   "trip_type": "one_way or round_trip",
   "passengers": 1,
   "cabin_class": "economy, premium_economy, business, or first",
-  "currency": "USD"
+  "currency": "ISO code the user named, e.g. INR, USD, AED"
 }}
 
 Rules:
@@ -40,7 +40,8 @@ Rules:
 - If a return date is mentioned, set trip_type to "round_trip"
 - Default passengers to 1 if not specified
 - Default cabin_class to "economy" if not specified
-- Default currency to "USD"
+- Use the currency named in the query. If the query names none, use the origin
+  country's currency, else "USD". Never assume USD just because it is the default.
 - If the query is not about flights (e.g., hotels, restaurants), return {{"error": "This query is not about flights."}}
 
 User query: {query}"""
@@ -176,7 +177,7 @@ Return ONLY a JSON object (no markdown, no explanation):
   "return_date": "YYYY-MM-DD or null",
   "duration_days": 5,
   "travelers": 2,
-  "budget": {{"max_total": null, "currency": "USD"}},
+  "budget": {{"max_total": null, "currency": "ISO code the user named, e.g. INR, USD, AED"}},
   "hotel_preferences": {{"class": null, "sort_by": "relevance"}},
   "flight_preferences": {{"stops": null, "cabin_class": "economy"}},
   "interests": [],
@@ -192,7 +193,8 @@ Rules:
 - If return date mentioned, calculate duration_days from departure to return
 - Default duration_days to 5 if not specified
 - Default travelers to 2 if not specified
-- Default currency to "USD"
+- Use the currency named in the query. If the query names none, use the origin
+  country's currency, else "USD". Never assume USD just because it is the default.
 - Default budget.max_total to null if not specified (user has no budget constraint)
 - If the user states ANY explicit budget number ("budget 1500", "make the budget 3000", "under $2000"), copy it verbatim into budget.max_total — never drop it, never invent a different number
 - Map budget WORDS to magnitudes only when no number is given, judging by trip context (cheap/budget ≈ 1000, mid-range ≈ 2500, luxury ≈ 5000)
@@ -264,6 +266,8 @@ Determine which CRITICAL fields are missing or unclear. A trip CANNOT be planned
 2. **origin** — Where are they traveling from? (REQUIRED for flights)
 3. **departure_date** — When do they leave? (REQUIRED)
 4. **return_date** or **duration_days** — When do they return / how long? (REQUIRED)
+   Satisfied in practice: the trip form defaults duration to 5 and always emits it
+   in buildQuery, so the number is always present. Do not ask about it.
 5. **budget** — What is their total budget? (REQUIRED for filtering options)
 6. **travelers** — How many people? (has default: 2)
 

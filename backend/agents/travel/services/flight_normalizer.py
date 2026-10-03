@@ -67,6 +67,7 @@ def _parse_stop(layover: dict[str, Any]) -> StopDetail:
 def normalize_flights(
     raw: dict[str, Any],
     booking_link: str = "",
+    currency: str = "USD",
 ) -> list[FlightResult]:
     all_entries: list[dict[str, Any]] = []
 
@@ -127,7 +128,7 @@ def normalize_flights(
             stops=len(flights) - 1,
             stop_details=stop_details,
             price=float(price),
-            currency="USD",
+            currency=currency,
             booking_link=booking_link,
             booking_token=entry.get("booking_token", "") or "",
             departure_token=entry.get("departure_token", "") or "",
@@ -147,11 +148,14 @@ def build_search_response(
 ) -> FlightSearchResponse:
     booking_link = raw.get("search_metadata", {}).get("google_flights_url", "")
 
-    flights = normalize_flights(raw, booking_link=booking_link)
-
     from backend.agents.travel.schemas.flight import FlightSearchRequest, TripType
 
     request = FlightSearchRequest(**request_dict)
+
+    # The google_flights payload carries no per-flight currency, so the request is
+    # the only source. Stamping "USD" here mislabelled every result the moment a
+    # non-USD currency was requested.
+    flights = normalize_flights(raw, booking_link=booking_link, currency=request.currency)
 
     return FlightSearchResponse(
         request=request,

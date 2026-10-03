@@ -69,7 +69,7 @@ def _maps_link(gps: dict[str, Any], name: str) -> str:
     return ""
 
 
-def normalize_hotels(raw: dict[str, Any]) -> list[HotelResult]:
+def normalize_hotels(raw: dict[str, Any], currency: str = "USD") -> list[HotelResult]:
     properties = raw.get("properties", [])
     results: list[HotelResult] = []
     dropped_no_link = 0
@@ -110,7 +110,7 @@ def normalize_hotels(raw: dict[str, Any]) -> list[HotelResult]:
             address=_extract_area(prop.get("nearby_places", [])),
             price_per_night=price_per_night,
             total_price=total_price,
-            currency="USD",
+            currency=currency,
             hotel_class=_extract_star_rating(
                 prop.get("hotel_class"), prop.get("extracted_hotel_class")
             ),
@@ -134,11 +134,14 @@ def build_hotel_search_response(
     request_dict: dict[str, Any],
     raw: dict[str, Any],
 ) -> HotelSearchResponse:
-    hotels = normalize_hotels(raw)
-
     from backend.agents.travel.schemas.hotel import HotelSearchRequest
 
     request = HotelSearchRequest(**request_dict)
+
+    # google_hotels returns native_currency as {} and formatted_price as None, so
+    # the only place the currency exists is search_parameters. Hardcoding "USD"
+    # relabelled every result whenever a non-USD currency was requested.
+    hotels = normalize_hotels(raw, currency=request.currency)
 
     return HotelSearchResponse(
         request=request,
