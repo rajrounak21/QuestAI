@@ -98,6 +98,52 @@ Message: {query}"""
 
 _ISO = r"\d{4}-\d{2}-\d{2}"
 
+# Fields that must be present before a search can run. Derived from what each
+# destination's form actually requires:
+#   flights valid = origin && destination && departure_date
+#   hotels  valid = location && check_in && check_out
+#   trips   valid = origin && destination && departure_date && budget >= 100
+#   jobs    runs on roles alone (locations are a filter, not a gate)
+#   research / shopping need only the query itself
+REQUIRED_FIELDS: dict[str, tuple[str, ...]] = {
+    "research": (),
+    "shopping": (),
+    "jobs": ("roles",),
+    "flights": ("origin", "destination", "departure_date"),
+    "hotels": ("location", "check_in", "check_out"),
+    "trips": ("origin", "destination", "departure_date", "budget_max"),
+}
+
+# What the destination form would fall back to anyway. Reported as `assumed` so
+# the UI can show what it decided rather than pretending the user said it. Dates
+# are deliberately absent - guessing one would run a search nobody asked for.
+FORM_DEFAULTS: dict[str, dict[str, Any]] = {
+    "flights": {"passengers": 1, "cabin": "economy"},
+    "hotels": {"guests": 2},
+    "trips": {"travelers": 2, "duration_days": 5},
+}
+
+
+def _summarise(value: Any) -> str:
+    if isinstance(value, list):
+        return ", ".join(str(v) for v in value[:3])
+    return str(value)
+
+
+def build_receipt(agent: str, fields: dict[str, Any]) -> dict[str, Any]:
+    """What the router understood, what it will assume, and what is still needed.
+
+    Computed before _merge_fields drops blanks, because the whole point is to
+    notice what is absent.
+    """
+    required = REQUIRED_FIELDS.get(agent, ())
+    defaults = FORM_DEFAULTS.get(agent, {})
+    return {
+        "understood": {k: _summarise(v) for k, v in fields.items()},
+        "assumed": {k: v for k, v in defaults.items() if not fields.get(k)},
+        "missing": [f for f in required if not fields.get(f)],
+    }
+
 
 def _iso_from(text: str) -> str:
     """Pull a YYYY-MM-DD out of free text, else ""."""
@@ -211,6 +257,18 @@ def _clean_payload(agent: str, data: dict[str, Any], q: str) -> dict[str, Any]:
         "reason": str(data.get("reason", ""))[:80],
         "confidence": max(0.0, min(1.0, conf)),
         "fields": fields,
+        "receipt": build_receipt(agent, fields),
+    }
+
+
+def _payload(agent: str, reason: str, confidence: float, fields: dict[str, Any]) -> dict[str, Any]:
+    """Every return path gets the same shape, so callers never special-case."""
+    return {
+        "agent": agent,
+        "reason": reason,
+        "confidence": confidence,
+        "fields": fields,
+        "receipt": build_receipt(agent, fields),
     }
 
 
@@ -218,11 +276,11 @@ def classify_intent(query: str) -> dict[str, Any]:
     """Choose one specialist and pre-extract its form fields. Never runs a search."""
     q = (query or "").strip()
     if not q:
-        return {"agent": ASSISTANT, "reason": "empty", "confidence": 0.0, "fields": {}}
+        return _payload(ASSISTANT, "empty", 0.0, {})
 
     # 1. Chit-chat is cheap to detect and must not cost an LLM call.
     if _looks_like_chitchat(q):
-        return {"agent": ASSISTANT, "reason": "greeting", "confidence": 1.0, "fields": {}}
+        return _payload(ASSISTANT, "greeting", 1.0, {})
 
     prompt = INTENT_PROMPT.format(agents=", ".join(AGENTS), query=q[:400])
     try:
@@ -234,14 +292,11 @@ def classify_intent(query: str) -> dict[str, Any]:
         if agent not in AGENTS:
             raise ValueError(f"model returned unknown agent: {agent!r}")
         out = _clean_payload(agent, data, q)
-        logger.info("Intent router: %s -> %s (%s)", q[:60], out["agent"], out["reason"])
+        logger.info(
+            "Intent router: %s -> %s (%s, missing=%s)",
+            q[:60], out["agent"], out["reason"], out["receipt"]["missing"] or "none",
+        )
         return out
     except Exception as exc:  # noqa: BLE001 - routing must never 500
         logger.warning("Intent routing failed (%s); using keyword fallback", exc)
-        agent = _keyword_agent(q)
-        return {
-            "agent": agent,
-            "reason": "keyword fallback",
-            "confidence": 0.4,
-            "fields": _regex_fields(agent, q),
-        }
+        return _payload(_keyword_agent(q), "keyword fallback", 0.4, _regex_fields(_keyword_agent(q), q))

@@ -23,6 +23,10 @@ class RouteOut(BaseModel):
     reason: str = ""
     confidence: float = 0.0
     fields: dict = {}
+    # What the router understood, what the destination form will assume, and
+    # which required fields it could not find. The Home page uses `missing` to
+    # decide whether to ask or just hand over.
+    receipt: dict = {}
     # None for the Assistant: the Home page renders its reply inline instead of
     # navigating, so there is no path to send the user to.
     path: str | None = None
@@ -33,7 +37,7 @@ def route(body: RouteIn, user: dict = Depends(get_current_user)) -> RouteOut:
     """Choose a specialist and pre-extract its form fields.
 
     Chooses only — it does not run anything. The caller navigates to `path` and
-    the destination page pre-fills its form; the user still presses Search.
+    the destination page pre-fills its form.
     """
     out = classify_intent(body.query)
     agent = out["agent"]
@@ -44,5 +48,6 @@ def route(body: RouteIn, user: dict = Depends(get_current_user)) -> RouteOut:
         reason=out.get("reason", ""),
         confidence=out.get("confidence", 0.0),
         fields=out.get("fields", {}),
+        receipt=out.get("receipt", {}),
         path=None if agent == ASSISTANT else DESTINATIONS.get(agent),
     )
