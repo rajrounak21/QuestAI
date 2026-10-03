@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import json
 import logging
 import os
@@ -13,50 +12,21 @@ load_dotenv(override=True)
 
 logger = logging.getLogger(__name__)
 
-# Vision models for the scanned-PDF fallback, read from GROQ_VISION_MODELS
-# (comma separated).
+# There is no image-based resume path in this module, and there used to be one
+# that could never run. It read a GROQ_VISION_MODELS variable and, when that was
+# empty, returned early - so the PDF-to-PNG renderer and the vision call below it
+# were unreachable on every run.
 #
-# Deliberately empty by default. The model ids that used to be hardcoded here
-# are all dead on this Groq key — verified against the live API:
-#   meta-llama/llama-4-maverick-17b-128e-instruct -> 404 does not exist
-#   meta-llama/llama-4-scout-17b-16e-instruct     -> 404 does not exist
-#   llama-3.2-11b-vision-preview                  -> 400 decommissioned
-# Leaving them in place cost three failed round trips (404, 404, 400) on every
-# scanned PDF before falling back. Set GROQ_VISION_MODELS once the account has a
-# vision-capable model and the path turns itself back on.
-VISION_MODELS = [
-    m.strip() for m in (os.getenv("GROQ_VISION_MODELS") or "").split(",") if m.strip()
-]
-
-RESUME_VISION_PROMPT = """You are a resume parser. Extract structured information from this resume image.
-
-Return ONLY a JSON object (no markdown, no explanation) with this schema:
-{
-  "target_roles": ["role 1", "role 2"],
-  "skills": ["skill1", "skill2"],
-  "experience_level": "internship|entry_level|mid_level|senior|unknown",
-  "employment_type": ["internship","full-time","contract"],
-  "locations": ["location1"],
-  "work_mode": ["remote","onsite","hybrid"],
-  "projects": [{"name": "Project Name", "stack": "Python, FastAPI", "description": "1 sentence"}],
-  "education": [{"degree": "B.Tech", "school": "University", "year": "2023"}],
-  "experience": [{"title": "Backend Intern", "company": "XYZ", "duration": "3 months"}],
-  "name": "Full Name",
-  "links": ["https://github.com/..."]
-}
-
-Rules:
-- target_roles: infer from title, objective, experience. e.g. Python Developer, AI Engineer, Backend Developer. Max 4.
-- skills: extract technical skills only (languages, frameworks, tools). Max 15.
-- experience_level: internship if student/intern mentioned, entry_level if 0-2 yrs, else mid/senior.
-- locations: ONLY if explicitly mentioned in resume. Do NOT invent.
-- work_mode, employment_type: only if explicit.
-- projects: up to 4, each with name, stack (tech used), 1-sentence description.
-- education: up to 2, degree + school.
-- experience: up to 3, title + company + duration if present.
-- Do NOT include raw_text (provided separately).
-- If image is blank/unreadable, return empty arrays.
-"""
+# The account has no vision-capable model at all. Listing the live key returns 11
+# models, none of them vision: gpt-oss-120b, gpt-oss-20b, qwen3.8-27b, allam-2-7b,
+# two orpheus variants, two llama-prompt-guard models, gpt-oss-safeguard-20b and
+# two whisper models. The model ids this path used to hardcode are dead too - two
+# return 404 and one returns 400 decommissioned - which is what cost three failed
+# round trips on every scanned PDF before falling back.
+#
+# Text PDFs are the normal case and are handled well below. A scanned PDF comes
+# back with no skills, which the upload endpoint turns into a 422 asking for a
+# text-based PDF.
 
 
 def _parse_json(text: str) -> dict[str, Any]:
@@ -145,25 +115,8 @@ def _regex_extract_profile(text: str) -> dict[str, Any]:
     }
 
 
-def pdf_to_base64_images(pdf_bytes: bytes, dpi: int = 200, max_pages: int = 2) -> list[str]:
-    """Render PDF pages to base64 PNGs. Uses PyMuPDF."""
-    import fitz  # PyMuPDF
-
-    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-    images: list[str] = []
-    for i in range(min(len(doc), max_pages)):
-        page = doc.load_page(i)
-        pix = page.get_pixmap(dpi=dpi)
-        png_bytes = pix.tobytes("png")
-        b64 = base64.b64encode(png_bytes).decode("utf-8")
-        images.append(b64)
-        logger.info(f"Rendered resume page {i+1}/{min(len(doc), max_pages)} dpi={dpi} size={len(png_bytes)} bytes")
-    doc.close()
-    return images
-
-
 def pdf_text_fallback(pdf_bytes: bytes, max_pages: int = 2) -> str:
-    """Fallback: extract text via PyMuPDF if vision fails."""
+    """Extract a resume's text layer with PyMuPDF, plus hyperlink targets."""
     import fitz
 
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
@@ -188,68 +141,18 @@ def pdf_text_fallback(pdf_bytes: bytes, max_pages: int = 2) -> str:
     return combined
 
 
-def _call_groq_vision(base64_images: list[str], prompt: str = RESUME_VISION_PROMPT) -> dict[str, Any]:
-    """Call Groq vision model with one or more images. Tries model chain on failure."""
-    import groq
-
-    api_key = os.getenv("GROQ_API_KEY")
-    if not api_key:
-        raise ValueError("GROQ_API_KEY not found")
-
-    client = groq.Groq(api_key=api_key)
-
-    # Build message with multiple images
-    content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
-    for b64 in base64_images:
-        content.append(
-            {
-                "type": "image_url",
-                "image_url": {"url": f"data:image/png;base64,{b64}"},
-            }
-        )
-
-    last_err = None
-    for model in VISION_MODELS:
-        try:
-            logger.info(f"Trying Groq vision model: {model}")
-            resp = client.chat.completions.create(
-                model=model,
-                messages=[{"role": "user", "content": content}],
-                temperature=0.0,
-                max_tokens=8192,
-            )
-            text = resp.choices[0].message.content or ""
-            logger.info(f"Groq vision response ({model}): {len(text)} chars")
-            try:
-                return _parse_json(text)
-            except Exception:
-                # if not JSON, treat as raw_text
-                logger.warning(f"Groq vision non-JSON response from {model}, wrapping as raw_text")
-                return {
-                    "raw_text": text,
-                    "target_roles": [],
-                    "skills": [],
-                    "experience_level": None,
-                    "employment_type": [],
-                    "locations": [],
-                    "work_mode": [],
-                    "preferences": [],
-                }
-        except Exception as e:
-            logger.warning(f"Groq vision model {model} failed: {e}")
-            last_err = e
-            continue
-    raise RuntimeError(f"All Groq vision models failed: {last_err}")
-
-
 def parse_resume_pdf(pdf_bytes: bytes) -> dict[str, Any]:
     """PDF bytes -> structured info.
 
-    Strategy (Groq vision not available on this account - fallback optimized):
-    1. Try fast text extraction via PyMuPDF.
-    2. If enough text (>80 chars), use LLM structuring directly (fast, accurate for text PDFs).
-    3. If too little text (scanned), try vision path (PDF->PNG->Groq vision). If vision fails, fallback to whatever text exists.
-    This keeps vision-first spec when needed, but avoids 3 failed vision calls for every normal resume.
+    Strategy:
+    1. Extract text with PyMuPDF, including hyperlink targets from annotations -
+       without those the parser never sees a URL, since the visible label is just
+       "GitHub" / "Live Demo".
+    2. If there is enough text (>80 chars), structure it with the text model. This
+       is the normal case and needs no image model.
+    3. If there is too little text, the PDF is scanned. There is no image path to
+       try, so return whatever text exists with empty skills and let the caller
+       ask for a text-based PDF.
     """
     if not pdf_bytes or len(pdf_bytes) < 100:
         return {
@@ -264,25 +167,25 @@ def parse_resume_pdf(pdf_bytes: bytes) -> dict[str, Any]:
             "error": "Empty PDF",
         }
 
-    # Fast path: text extraction (PyMuPDF is accurate for text PDFs - vision not needed)
+    # Fast path: PyMuPDF text extraction is accurate for text PDFs.
     quick_text = pdf_text_fallback(pdf_bytes)
     if quick_text and len(quick_text.strip()) > 80:
         try:
             result = _llm_extract_from_text(quick_text)
             logger.info(f"Resume text path succeeded: {len(quick_text)} chars, roles={result.get('target_roles')}")
-            # Guard: if LLM returned empty roles/skills despite rich text, might be parse issue — still return it (don't vision-loop)
             return result
         except Exception as e:
-            logger.warning(f"LLM text extract failed (text PDF, skipping vision): {e}")
-            # For text PDFs, don't waste 3 vision calls (Groq has no vision on this key) — try once more with regex fallback
+            logger.warning(f"LLM text extract failed on a text PDF: {e}")
+            # Retry once - _llm_extract_from_text falls back to regex internally
+            # when the model returns JSON it could not parse.
             try:
-                # Re-attempt with same path but _llm_extract will fallback to regex internally
                 result = _llm_extract_from_text(quick_text)
                 if result.get("target_roles"):
                     return result
             except Exception:
                 pass
-            # Return partial if needed — still better than vision 404s
+            # Partial is still better than nothing: the text survives even when
+            # structuring failed.
             return {
                 "raw_text": quick_text,
                 "target_roles": [],
@@ -295,60 +198,22 @@ def parse_resume_pdf(pdf_bytes: bytes) -> dict[str, Any]:
                 "llm_error": str(e),
             }
 
-    # Scanned / low-text path: only if text extraction was short (<80 chars)
-    # For now skip vision if Groq vision unavailable; fallback to whatever text exists
-    if len(quick_text.strip()) >= 80:
-        # Already tried LLM above, return fallback
-        return {
-            "raw_text": quick_text,
-            "target_roles": [],
-            "skills": [],
-            "experience_level": None,
-            "employment_type": [],
-            "locations": [],
-            "work_mode": [],
-            "preferences": [],
-        }
-
-    # Scanned PDF (too little text to structure). Vision is the only way forward,
-    # but this account has no vision model, so say so instead of burning three
-    # failing round trips. The caller turns the empty skills into a 4xx that
-    # tells the user to use a text-based PDF.
-    if not VISION_MODELS:
-        logger.info("Scanned PDF and no GROQ_VISION_MODELS configured; text path only.")
-        return {
-            "raw_text": quick_text,
-            "target_roles": [],
-            "skills": [],
-            "experience_level": None,
-            "employment_type": [],
-            "locations": [],
-            "work_mode": [],
-            "preferences": [],
-            "vision_error": "no vision model configured for scanned PDF",
-        }
-
-    try:
-        b64_images = pdf_to_base64_images(pdf_bytes, dpi=200, max_pages=2)
-    except Exception as e:
-        logger.error(f"PDF render failed: {e}")
-        return {"raw_text": quick_text, "target_roles": [], "skills": [], "experience_level": None, "employment_type": [], "locations": [], "work_mode": [], "preferences": [], "render_error": str(e)}
-
-    if not b64_images:
-        return {"raw_text": quick_text, "target_roles": [], "skills": [], "experience_level": None, "employment_type": [], "locations": [], "work_mode": [], "preferences": []}
-
-    try:
-        result = _call_groq_vision(b64_images)
-        result.setdefault("raw_text", quick_text)
-        for k in ["target_roles", "skills", "employment_type", "locations", "work_mode", "preferences"]:
-            result.setdefault(k, [])
-        result.setdefault("experience_level", None)
-        if len(result.get("raw_text", "")) < len(quick_text):
-            result["raw_text"] = quick_text
-        return result
-    except Exception as e:
-        logger.warning(f"Vision parse failed: {e}")
-        return {"raw_text": quick_text, "target_roles": [], "skills": [], "experience_level": None, "employment_type": [], "locations": [], "work_mode": [], "preferences": [], "vision_error": str(e)}
+    # Scanned / low-text PDF: extraction produced too little to structure. There is
+    # no image model to fall back on (see the note at the top of this module), so
+    # return what text exists. The upload endpoint turns the empty skills into a
+    # 422 asking for a text-based PDF, which is honest rather than a fabricated
+    # parse.
+    logger.info("Scanned PDF with too little text to structure; no vision model available.")
+    return {
+        "raw_text": quick_text,
+        "target_roles": [],
+        "skills": [],
+        "experience_level": None,
+        "employment_type": [],
+        "locations": [],
+        "work_mode": [],
+        "preferences": [],
+    }
 
 
 def _llm_extract_from_text(text: str) -> dict[str, Any]:

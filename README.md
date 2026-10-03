@@ -139,11 +139,11 @@ Everything else has a working default. Optional groups: Google OAuth, SMTP
 app runs but cannot deliver a signup code; without Google credentials the OAuth
 button stays hidden.
 
-There is only **one** Groq key — the same `GROQ_API_KEY` makes vision calls.
-`GROQ_VISION_MODELS` is not a credential; it is a comma-separated list of model
-IDs for the scanned-PDF resume path, and it ships **empty on purpose** because
-the models it previously used now return 404/400 on Groq. Leave it empty and Jobs
-falls back to text extraction, which handles normal text PDFs correctly.
+One Groq key covers everything, including resume parsing. Resume upload works off
+the PDF's text layer, so a normal text-based PDF parses fine; a *scanned* PDF
+(image-only, no text) has nothing to read and returns a 422 asking for a
+text-based one. There is no image-model path — the Groq account this was built
+against exposes no vision-capable model.
 
 ---
 
