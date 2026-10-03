@@ -71,7 +71,7 @@ export default function App() {
     if (route === "flow-research") return <div className="landing-scope"><FlowPage flowId="research" /></div>;
     if (route === "flow-shopping") return <div className="landing-scope"><FlowPage flowId="shopping" /></div>;
     if (route === "flow-travel") return <div className="landing-scope"><FlowPage flowId="travel" /></div>;
-  if (route === "flow-jobs") return <div className="landing-scope"><FlowPage flowId="jobs" /></div>;
+    if (route === "flow-jobs") return <div className="landing-scope"><FlowPage flowId="jobs" /></div>;
     return <div className="landing-scope"><LegalPage doc={route} /></div>;
   }
 
