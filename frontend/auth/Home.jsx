@@ -5,6 +5,17 @@ import { BellIcon, BriefcaseIcon, MenuIcon, SendIcon } from "./components/icons"
 import AgentSelect from "./components/AgentSelect";
 import { AGENT_BY_ID, AGENT_OPTIONS, DEFAULT_AGENT_ID } from "../src/shared/agents";
 import { LogoMark, ThemeToggle } from "./components/ui";
+import Clarifying from "../src/shared/Clarifying";
+import { asksFor } from "../src/shared/agentFields";
+
+const AGENT_LABELS = {
+  research: "Research",
+  shopping: "Shopping",
+  jobs: "Jobs",
+  flights: "Flights",
+  hotels: "Hotels",
+  trips: "Trips",
+};
 
 const NAV = ["Home", "Research", "Travel", "Shopping", "Jobs"];
 const NAV_PATH = {
@@ -135,8 +146,15 @@ export default function Home() {
   // the Assistant's inline answer (it has no page to navigate to).
   const [thinking, setThinking] = useState(false);
   const [reply, setReply] = useState(null); // { q, text }
-  const [routeError, setRouteError] = useState(null);
-  const [activity, setActivity] = useState([]);
+const [routeError, setRouteError] = useState(null);
+const [activity, setActivity] = useState([]);
+  // Set when the router picked an agent but a required field was missing. The
+  // asker renders in the chat area instead of navigating, so the user never
+  // reaches a form they would only have to come back from.
+  const [pendingRoute, setPendingRoute] = useState(null);
+  // One ask per distinct question. Without this, re-submitting the same
+  // sentence would loop: route -> ask -> answer -> route -> ask.
+  const askedRef = useRef(new Set());
 
   useEffect(() => {
     if (!getToken()) {
@@ -291,15 +309,22 @@ export default function Home() {
               : "The router did not choose an agent. Please try rephrasing."
           );
         }
+        // Ask before navigating when a required field is missing, so the user
+        // answers in their own words instead of landing on a half-filled form.
+        // The router told us exactly what it could not get.
+        const missing = d.receipt?.missing || [];
+        if (missing.length > 0 && !askedRef.current.has(q)) {
+          askedRef.current.add(q);
+          setPendingRoute({ route: d, q, agent: d.agent });
+          return;
+        }
+
         // `state` (not the URL) carries the pre-extracted fields. It dies with
         // the navigation, so a refresh falls back to the page's own parser
         // instead of re-applying stale values.
         //
-        // autoRun fires only when the router has every required field. Anything
-        // missing comes back as `receipt.missing`, and the form stays idle so it
-        // can ask rather than guess. That is the whole difference between an
-        // agent and a redirect.
-        const missing = d.receipt?.missing || [];
+        // autoRun fires only when nothing was missing. That is the whole
+        // difference between an agent and a redirect.
         navigate(`${d.path}?q=${encodeURIComponent(q)}`, {
           state: {
             prefill: {
@@ -321,6 +346,48 @@ export default function Home() {
             : err.message || "Could not reach the assistant."
         );
       })
+      .finally(() => setThinking(false));
+  };
+
+  /**
+   * Answers from the inline asker are folded back into the original question and
+   * re-routed rather than merged client-side. Going through the router again
+   * means the answers get the same normalisation as everything else - a typed
+   * "5 Jan" becomes 2027-01-05 because _clean_payload coerces it, which a local
+   * merge could not do.
+   */
+  const handleAnswers = (answerLines) => {
+    if (!pendingRoute) return;
+    const combined = `${pendingRoute.q}\n${answerLines}`;
+    setThinking(true);
+    setPendingRoute(null);
+    setThinking(true);
+    routeIntent(combined)
+      .then((d) => {
+        if (d.unauthorized) {
+          navigate("/login", { replace: true });
+          return;
+        }
+        if (d.networkError) throw new Error("Cannot reach the server. Is the backend running?");
+        if (d.agent === "assistant" || !d.path) {
+          throw new Error("Could not work out where to send that. Try rephrasing.");
+        }
+        const missing = d.receipt?.missing || [];
+        navigate(`${d.path}?q=${encodeURIComponent(combined)}`, {
+          state: {
+            prefill: {
+              agent: d.agent,
+              query: combined,
+              fields: d.fields || {},
+              receipt: d.receipt || null,
+              reason: d.reason || "",
+              confidence: typeof d.confidence === "number" ? d.confidence : null,
+              autoRun: missing.length === 0,
+            },
+          },
+        });
+      })
+      .catch((err) => setRouteError(err.message || "Could not reach the assistant."))
       .finally(() => setThinking(false));
   };
 
@@ -431,10 +498,12 @@ export default function Home() {
           {/* The conversation sits directly under the input, not at the bottom
               of the page. It is the answer to what the user just typed, so it
               belongs next to the box they typed it in. */}
-          {(thinking || reply || routeError) && (
+          {(thinking || reply || routeError || pendingRoute) && (
             <div className="dash-chat" role="status" aria-live="polite">
               <div className="dash-chat-row dash-chat-you">
-                <span className="dash-chat-bubble">{reply ? reply.q : query.trim()}</span>
+                <span className="dash-chat-bubble">
+                  {pendingRoute ? pendingRoute.q : reply ? reply.q : query.trim()}
+                </span>
               </div>
 
               {thinking && (
@@ -461,11 +530,26 @@ export default function Home() {
                 </div>
               )}
 
-              {!thinking && (
+              {/* The router understood most of it but a required field was
+                  missing. Ask here rather than handing over a form that is
+                  already blocked. */}
+              {pendingRoute && !thinking && (
+                <Clarifying
+                  questions={asksFor(pendingRoute.route?.receipt?.missing || [])}
+                  message={`I can take this to ${
+                    AGENT_LABELS[pendingRoute.agent] || pendingRoute.agent
+                  } — I just need a couple of details:`}
+                  loading={thinking}
+                  submitLabel="Run it"
+                  onAnswer={handleAnswers}
+                />
+              )}
+
+              {!thinking && (reply || routeError || pendingRoute) && (
                 <button
                   type="button"
                   className="dash-chat-close"
-                  onClick={() => { setReply(null); setRouteError(null); }}
+                  onClick={() => { setReply(null); setRouteError(null); setPendingRoute(null); }}
                   aria-label="Dismiss reply"
                   title="Dismiss"
                 >

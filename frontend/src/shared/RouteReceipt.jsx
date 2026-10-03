@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { FIELD_ORDER, askFor, fieldLabel } from "./agentFields";
 import "./route-receipt.css";
 
 /**
@@ -11,26 +12,6 @@ import "./route-receipt.css";
  * `prefill` is the hand-off object from Home via useRouterPrefill.
  */
 
-const FIELD_LABELS = {
-  origin: "from",
-  destination: "to",
-  departure_date: "leaves",
-  return_date: "returns",
-  check_in: "check-in",
-  check_out: "check-out",
-  location: "location",
-  guests: "guests",
-  passengers: "passengers",
-  travelers: "travelers",
-  cabin: "cabin",
-  budget_max: "budget",
-  duration_days: "nights",
-  roles: "roles",
-  locations: "locations",
-  work_mode: "work mode",
-  query: "query",
-};
-
 const AGENT_LABELS = {
   research: "Research",
   shopping: "Shopping",
@@ -40,41 +21,20 @@ const AGENT_LABELS = {
   trips: "Trips",
 };
 
-// Order the receipt reads the way the request did, not alphabetically.
-const ORDER = [
-  "roles", "locations", "work_mode",
-  "origin", "destination", "departure_date", "return_date",
-  "location", "check_in", "check_out",
-  "duration_days", "travelers", "budget_max",
-  "guests", "passengers", "cabin",
-  "query",
-];
-
-const label = (k) => FIELD_LABELS[k] || k.replace(/_/g, " ");
+const isBlank = (v) =>
+  v === "" || v === null || v === undefined || (Array.isArray(v) && !v.length);
 
 function pairs(obj) {
   if (!obj) return [];
   return Object.entries(obj)
-    .filter(([, v]) => v !== "" && v !== null && v !== undefined && !(Array.isArray(v) && !v.length))
+    .filter(([, v]) => !isBlank(v))
     .sort((a, b) => {
-      const ia = ORDER.indexOf(a[0]);
-      const ib = ORDER.indexOf(b[0]);
+      const ia = FIELD_ORDER.indexOf(a[0]);
+      const ib = FIELD_ORDER.indexOf(b[0]);
       return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
     })
-    .map(([k, v]) => `${label(k)}: ${Array.isArray(v) ? v.join(", ") : v}`);
+    .map(([k, v]) => `${fieldLabel(k)}: ${Array.isArray(v) ? v.join(", ") : v}`);
 }
-
-const FIELD_QUESTIONS = {
-  origin: "Where are you flying from?",
-  destination: "Where are you flying to?",
-  departure_date: "What date do you want to travel?",
-  return_date: "What date do you want to come back?",
-  check_in: "What date do you check in?",
-  check_out: "What date do you check out?",
-  location: "Which city or area?",
-  roles: "What role are you looking for?",
-  locations: "Any preferred locations?",
-};
 
 export default function RouteReceipt({ prefill }) {
   const [dismissed, setDismissed] = useState(false);
@@ -86,7 +46,7 @@ export default function RouteReceipt({ prefill }) {
   const missing = receipt.missing || [];
   if (!understood.length && !assumed.length && !missing.length) return null;
 
-  const ask = missing.map((f) => FIELD_QUESTIONS[f] || `Tell me ${label(f)}.`);
+  const ask = missing.slice(0, 4).map((f) => askFor(f).question);
 
   return (
     <div className="route-receipt" role="status">

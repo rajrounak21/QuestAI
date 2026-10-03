@@ -1,0 +1,49 @@
+/* Clarifying questions - option chips plus a free-text box per field.
+   Lives with the component rather than in Trips.css so the Home page can render
+   the same asker without pulling in the trip planner's whole stylesheet. */
+
+.trip-clarify {
+  background: var(--bg1);
+  border: 1px solid var(--accent);
+  border-radius: 14px;
+  padding: 18px;
+  margin: 14px 0;
+}
+
+.trip-clarify h3 {
+  margin: 0 0 12px;
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.trip-q { margin-bottom: 16px; }
+
+.trip-q-text {
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 2px;
+}
+
+.trip-q-why {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+
+.trip-q .fl-input { margin-top: 8px; }
+
+/* On the dashboard the asker sits inside the chat bubble area, which is
+   narrower than the trip page. */
+.dash-chat .trip-clarify {
+  background: transparent;
+  border: 0;
+  border-left: 2px solid var(--accent);
+  border-radius: 0;
+  padding: 2px 0 2px 0.9rem;
+  margin: 6px 0 2px;
+}
+
+.dash-chat .trip-clarify h3 {
+  font-size: 0.86rem;
+  margin-bottom: 10px;
+}

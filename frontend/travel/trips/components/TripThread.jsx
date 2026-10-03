@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import Clarifying from "./Clarifying";
+import Clarifying from "../../../src/shared/Clarifying";
 import TripSearch from "./TripSearch";
 import { timeAgo } from "../api";
 

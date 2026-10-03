@@ -2,24 +2,33 @@
    margin: 18px 0;
 }
 .trip-loading > p {
-    
-    display: flex; align-items: center; gap: 10px;  
+  
+  
+    display: flex; align-items: center; gap: 10px;
+  
     color: var(--text); font-size: 0.92rem; margin: 0 0 14px;
 }
 .trip-loading .spinner {
-    
-    width: 18px; height: 18px; flex-shrink: 0;  
-    border: 2px solid var(--line); border-top-color: var(--accent);  
+  
+  
+    width: 18px; height: 18px; flex-shrink: 0;
+  
+    border: 2px solid var(--line); border-top-color: var(--accent);
+  
     border-radius: 50%; animation: spin 1s linear infinite;
 }
 .trip-skeleton {
    display: flex; flex-direction: column; gap: 12px;
 }
 .sk-line, .sk-card {
-    
-    border-radius: 12px;  
-    background: linear-gradient(90deg, var(--soft) 25%, var(--bg1) 50%, var(--soft) 75%);  
-    background-size: 200% 100%;  
+  
+  
+    border-radius: 12px;
+  
+    background: linear-gradient(90deg, var(--soft) 25%, var(--bg1) 50%, var(--soft) 75%);
+  
+    background-size: 200% 100%;
+  
     animation: sk-shimmer 1.4s ease infinite;
 }
 .sk-line {
@@ -46,8 +55,10 @@
   }
 }
 @keyframes sk-shimmer {
-    
-    0% { background-position: 200% 0; }  
+  
+  
+    0% { background-position: 200% 0; }
+  
     100% { background-position: -200% 0; }
 }
 .sugg-chip.active {
@@ -71,29 +82,11 @@
 .trip-progress p {
    display: flex; align-items: center; color: var(--text); font-size: 0.9rem; margin: 4px 0;
 }
-.trip-clarify {
-    
-    background: var(--bg1); border: 1px solid var(--accent); border-radius: 14px;  
-    padding: 18px; margin: 14px 0;
-}
-.trip-clarify h3 {
-   margin: 0 0 12px; color: var(--text); font-size: 1rem;
-}
-.trip-q {
-   margin-bottom: 16px;
-}
-.trip-q-text {
-   font-weight: 600; color: var(--text); margin: 0 0 2px;
-}
-.trip-q-why {
-   font-size: 0.78rem; color: var(--muted); margin: 0 0 8px;
-}
-.trip-q .fl-input {
-   margin-top: 8px;
-}
 .trip-overview {
-    
-    background: var(--bg1); border: 1px solid var(--line); border-radius: 14px;  
+  
+  
+    background: var(--bg1); border: 1px solid var(--line); border-radius: 14px;
+  
     padding: 16px; margin: 14px 0;
 }
 .trip-route h2 {
@@ -142,8 +135,10 @@
    display: flex; flex-direction: column; gap: 12px;
 }
 .trip-day {
-    
-    background: var(--bg1); border: 1px solid var(--line); border-radius: 12px;  
+  
+  
+    background: var(--bg1); border: 1px solid var(--line); border-radius: 12px;
+  
     padding: 14px; border-left: 3px solid var(--accent);
 }
 .trip-day-head {
@@ -153,9 +148,12 @@
    margin-bottom: 8px;
 }
 .trip-day-num {
-    
-    font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;  
-    color: #fff; background: linear-gradient(135deg, #5b7cff, #8b5cf6);  
+  
+  
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+  
+    color: #fff; background: linear-gradient(135deg, #5b7cff, #8b5cf6);
+  
     padding: 3px 10px; border-radius: 999px;
 }
 .trip-day-head strong {
@@ -195,21 +193,30 @@
    from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; }
 }
 .message-avatar {
-    
-    width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;  
-    background: var(--grad); color: #fff;  
+  
+  
+    width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+  
+    background: var(--grad); color: #fff;
+  
     display: flex; align-items: center; justify-content: center; font-size: 1rem;
 }
 .user-bubble {
-    
-    background: linear-gradient(135deg, #5b7cff, #8b5cf6); color: #fff;  
-    padding: 0.7rem 1rem; border-radius: 18px 18px 4px 18px;  
+  
+  
+    background: linear-gradient(135deg, #5b7cff, #8b5cf6); color: #fff;
+  
+    padding: 0.7rem 1rem; border-radius: 18px 18px 4px 18px;
+  
     max-width: 75%; line-height: 1.5; word-wrap: break-word; font-size: 0.9rem;
 }
 .assistant-bubble {
-    
-    background: var(--bg1); border: 1px solid var(--line); color: var(--text);  
-    padding: 1rem; border-radius: 18px 18px 18px 4px;  
+  
+  
+    background: var(--bg1); border: 1px solid var(--line); color: var(--text);
+  
+    padding: 1rem; border-radius: 18px 18px 18px 4px;
+  
     max-width: 100%; flex: 1; min-width: 0;
 }
 .assistant-bubble > p:first-child {
@@ -228,8 +235,10 @@
    display: inline-flex; gap: 4px;
 }
 .typing-dots span {
-    
-    width: 7px; height: 7px; border-radius: 50%; background: var(--muted);  
+  
+  
+    width: 7px; height: 7px; border-radius: 50%; background: var(--muted);
+  
     animation: typing-bounce 1.2s infinite;
 }
 .typing-dots span:nth-child(2) {
@@ -251,9 +260,12 @@
    display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 2px 10px 42px;
 }
 .quick-action {
-    
-    background: var(--soft); border: 1px solid var(--line); color: var(--text);  
-    padding: 6px 12px; border-radius: 999px; font-size: 0.78rem; cursor: pointer;  
+  
+  
+    background: var(--soft); border: 1px solid var(--line); color: var(--text);
+  
+    padding: 6px 12px; border-radius: 999px; font-size: 0.78rem; cursor: pointer;
+  
     transition: all 0.15s; font-family: inherit;
 }
 .quick-action:hover:not(:disabled) {
@@ -266,9 +278,12 @@
    border-color: var(--accent); color: var(--accent); font-weight: 600;
 }
 .qa-input-row {
-    
-    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;  
-    background: var(--bg1); border: 1px solid var(--accent); border-radius: 14px;  
+  
+  
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  
+    background: var(--bg1); border: 1px solid var(--accent); border-radius: 14px;
+  
     padding: 10px 12px; margin: 0 2px 10px 42px;
 }
 .qa-label {
@@ -281,23 +296,31 @@
    width: 38px; height: 38px; font-size: 1rem;
 }
 .chat-input-bar {
-    
-    display: flex; gap: 10px; padding: 12px;  
-    background: var(--bg1); border: 1px solid var(--line); border-radius: 14px;  
+  
+  
+    display: flex; gap: 10px; padding: 12px;
+  
+    background: var(--bg1); border: 1px solid var(--line); border-radius: 14px;
+  
     position: sticky; bottom: 12px;
 }
 .chat-input {
-    
-    flex: 1; padding: 0.7rem 1rem; border: 1px solid var(--line); border-radius: 24px;  
+  
+  
+    flex: 1; padding: 0.7rem 1rem; border: 1px solid var(--line); border-radius: 24px;
+  
     background: var(--bg0); color: var(--text); font-size: 0.9rem; outline: none; font-family: inherit;
 }
 .chat-input:focus {
    border-color: var(--accent);
 }
 .chat-send-btn {
-    
-    width: 44px; height: 44px; border-radius: 50%; border: none; flex-shrink: 0;  
-    background: var(--grad); color: #fff; font-size: 1.2rem; cursor: pointer;  
+  
+  
+    width: 44px; height: 44px; border-radius: 50%; border: none; flex-shrink: 0;
+  
+    background: var(--grad); color: #fff; font-size: 1.2rem; cursor: pointer;
+  
     display: flex; align-items: center; justify-content: center;
 }
 .chat-send-btn:disabled {
@@ -310,17 +333,22 @@
    margin: 14px 0 0;
 }
 button.trip-coll-head {
-    
-    width: 100%; display: flex; align-items: center; gap: 10px;  
-    background: transparent; border: none; padding: 0; margin: 0 0 12px;  
+  
+  
+    width: 100%; display: flex; align-items: center; gap: 10px;
+  
+    background: transparent; border: none; padding: 0; margin: 0 0 12px;
+  
     cursor: pointer; font-family: inherit; color: inherit; text-align: left;
 }
 button.trip-coll-head h3 {
    margin: 0;
 }
 button.trip-coll-head .count-strong {
-    
-    background: var(--soft); border: 1px solid var(--line);  
+  
+  
+    background: var(--soft); border: 1px solid var(--line);
+  
     border-radius: 999px; padding: 1px 9px; font-size: 0.75rem;
 }
 button.trip-coll-head .trip-chevron {
@@ -336,9 +364,12 @@ button.trip-coll-head .trip-chevron {
    padding: 6px 12px; font-size: 0.78rem;
 }
 button.trip-day-head {
-    
-    width: 100%; text-align: left; cursor: pointer;  
-    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;  
+  
+  
+    width: 100%; text-align: left; cursor: pointer;
+  
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  
     background: transparent; border: none; padding: 0; font-family: inherit; color: inherit;
 }
 .trip-day-meta {
