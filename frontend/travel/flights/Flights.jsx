@@ -251,11 +251,7 @@ export default function Flights() {
         <PriceDisclaimer />
         {routerPrefill && <RouteReceipt prefill={routerPrefill} />}
         <FlightSearch onSearch={handleSearch} loading={loading} initialQuery={prefillQuery} initialFields={prefillFields} autoRun={!!routerPrefill?.autoRun} />
-        {loading ? (
-          <LoadingResults label="Searching live flights" />
-        ) : (
-          <p className="search-hint"><span className="dot-pulse" /> Live Google Flights results</p>
-        )}
+        {loading && <LoadingResults label="Searching live flights" />}
 
         {sessionId && (
           <div className="session-head">

@@ -14,6 +14,12 @@
   margin: 0 0 12px;
 }
 
+.loading-results-est {
+  margin-left: auto;
+  color: var(--faint);
+  font-size: 0.8rem;
+}
+
 .loading-results-rows {
   display: flex;
   flex-direction: column;
