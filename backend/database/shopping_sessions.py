@@ -50,12 +50,14 @@ def upsert_session_on_search(
                 "location_label": location_label,
                 "last_search_at": now,
                 "updated_at": now,
+                # Follows the most recent search, not the first - see the note
+                # in hotel_sessions.py.
+                "title": make_title(query),
+                "query": query,
             },
             "$setOnInsert": {
                 "user_id": user_id,
                 "session_id": session_id,
-                "title": make_title(query),
-                "query": query,
                 "created_at": now,
             },
         },

@@ -55,13 +55,17 @@ def upsert_session_on_search(
                 "flight_count": flight_count,
                 "last_search_at": now,
                 "updated_at": now,
+                # Follows the most recent search, not the first. See the note in
+                # hotel_sessions.py - in $setOnInsert this only ever ran once,
+                # so a session kept the opening search's title while
+                # origin/destination kept moving and the results below changed.
+                "title": make_title(query),
+                "query": query,
                 **summary,
             },
             "$setOnInsert": {
                 "user_id": user_id,
                 "session_id": session_id,
-                "title": make_title(query),
-                "query": query,
                 "created_at": now,
             },
         },
@@ -122,6 +126,31 @@ def get_session_with_latest_search(
         sort=[("created_at", -1)],
     )
     return session, latest
+
+
+def list_session_searches(user_id: str, session_id: str, limit: int = 20) -> list[dict[str, Any]]:
+    """Every search run inside one session, newest first.
+
+    Each search is its own row, so this is the only place the earlier ones were
+    ever reachable - previously a session showed latest-only and the rest sat in
+    Mongo unseen. Flights are left out on purpose: this backs a compact list,
+    and the page loads results through get_session_with_latest_search().
+    """
+    from backend.database.collections import get_flight_searches_collection
+
+    cur = (
+        get_flight_searches_collection()
+        .find(
+            {"user_id": user_id, "session_id": session_id},
+            {"query": 1, "flight_count": 1, "created_at": 1, "_id": 0},
+        )
+        .sort("created_at", -1)
+        .limit(max(1, min(limit, 50)))
+    )
+    items = list(cur)
+    for it in items:
+        it["created_at"] = it["created_at"].isoformat() if it.get("created_at") else ""
+    return items
 
 
 def delete_session(user_id: str, session_id: str) -> bool:

@@ -14,6 +14,7 @@ import { getToken } from "../../auth/api";
 // Styles shared with the hotels and trips pages. Flights.css is gone: it had no
 // rules of its own, every one of them lived in the other two stylesheets too.
 import "../shared/travel.css";
+import "./search-log.css";
 
 const DEFAULT_FILTERS = { stops: "any", airlines: [], maxPrice: null, sortBy: "price_asc" };
 
@@ -31,6 +32,9 @@ export default function Flights() {
 
   const [sessions, setSessions] = useState([]);
   const [sessionTitle, setSessionTitle] = useState("");
+  // Every search run in this session, newest first. More than one means the
+  // user changed the route or dates inside the same workspace.
+  const [searchLog, setSearchLog] = useState([]);
   const [lastSearched, setLastSearched] = useState("");
 
   const [confirmDelete, setConfirmDelete] = useState(null);
@@ -128,7 +132,12 @@ export default function Flights() {
       .then((d) => {
         if (!alive) return;
         const latest = d.latest;
-        setSessionTitle(d.session?.title || d.session?.query || "");
+        // The latest search row's query, not session.title. Title is written
+        // with $setOnInsert so it stays frozen at the session's first search,
+        // while origin/destination in the same doc are $set every time - so
+        // session.title can describe a completely different flight than the
+        // results beside it. The searches collection already holds the truth.
+        setSessionTitle(latest?.query || d.session?.title || d.session?.query || "");
         setLastSearched(d.session?.last_search_at || latest?.created_at || "");
         setFlights(latest?.flights || []);
         setFlightParams(latest?.params || d.session?.params || null);
@@ -144,6 +153,24 @@ export default function Flights() {
       });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId]);
+
+  // Earlier searches in this session. Each one is its own row, so without this
+  // they existed only in Mongo and the page showed the newest one as if it were
+  // the only one. Mongo read, no SerpApi cost.
+  useEffect(() => {
+    if (!sessionId) {
+      setSearchLog([]);
+      return;
+    }
+    let alive = true;
+    flightsApi
+      .searches(sessionId)
+      .then((d) => {
+        if (alive) setSearchLog(d.items || []);
+      })
+      .catch(() => {});
+    return () => { alive = false; };
   }, [sessionId]);
 
   // ?q= from the dashboard only PREFILLS the form. It used to call
@@ -258,6 +285,21 @@ export default function Flights() {
             <div>
               <h2>{sessionTitle || "Saved flights"}</h2>
               {lastSearched && <p className="sess-sub">Last searched {timeAgo(lastSearched)} · prices may have changed</p>}
+              {searchLog.length > 1 && (
+                <details className="search-log">
+                  <summary>{searchLog.length} searches in this session</summary>
+                  <ul>
+                    {searchLog.map((s, i) => (
+                      <li key={`${s.created_at}-${i}`}>
+                        <span>{s.query}</span>
+                        <span className="search-log-meta">
+                          {s.flight_count ?? 0} flights · {timeAgo(s.created_at)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
             </div>
             <div className="session-actions">
               <button className="btn-again" disabled={loading} onClick={() => handleSearch(sessionTitle, { again: true })}>

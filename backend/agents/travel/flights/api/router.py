@@ -14,6 +14,7 @@ from backend.database.flight_sessions import (
     get_session_with_latest_search,
     insert_search,
     list_session_history,
+    list_session_searches,
     upsert_session_on_search,
 )
 
@@ -139,6 +140,20 @@ def history(limit: int = 20, user: dict = Depends(get_current_user)):
     for it in items:
         it["_id"] = str(it["_id"])
     return {"items": items}
+
+
+@router.get("/{session_id}/searches")
+def list_searches(
+    session_id: str, limit: int = 20, user: dict = Depends(get_current_user)
+) -> dict[str, Any]:
+    """Every search run in this session, newest first. No SerpApi cost.
+
+    Declared before /{session_id} so the literal path is not swallowed by it.
+    """
+    session, _ = get_session_with_latest_search(user["id"], session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="flight session not found")
+    return {"items": list_session_searches(user["id"], session_id, limit=limit)}
 
 
 @router.get("/{session_id}")

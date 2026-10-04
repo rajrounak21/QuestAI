@@ -55,13 +55,19 @@ def upsert_session_on_search(
                 "hotel_count": hotel_count,
                 "last_search_at": now,
                 "updated_at": now,
+                # A session is one workspace holding many searches, so the
+                # heading has to follow the most recent one. These sat in
+                # $setOnInsert, which Mongo applies only when the document is
+                # first created - the title froze at the opening search while
+                # origin/destination below kept updating, so a saved session
+                # ended up labelled with a different stay than the one listed.
+                "title": make_title(query),
+                "query": query,
                 **summary,
             },
             "$setOnInsert": {
                 "user_id": user_id,
                 "session_id": session_id,
-                "title": make_title(query),
-                "query": query,
                 "created_at": now,
             },
         },

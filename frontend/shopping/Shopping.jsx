@@ -157,7 +157,9 @@ export default function Shopping() {
       .then((d) => {
         if (!alive) return;
         const latest = d.latest;
-        setSessionTitle(d.session?.title || d.session?.query || "");
+        // See Flights.jsx - session.title is frozen at the first search, so use the
+        // latest search row's query instead or the heading contradicts the list.
+        setSessionTitle(latest?.query || d.session?.title || d.session?.query || "");
         setLastSearched(d.session?.last_search_at || latest?.created_at || "");
         const sessLoc = d.session?.location || latest?.location || "";
         setSessionLocation(sessLoc);

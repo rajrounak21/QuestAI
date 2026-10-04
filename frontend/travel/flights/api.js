@@ -19,6 +19,8 @@ export const flightsApi = {
     unwrap(await authFetch(`/api/flights/history?limit=${limit}`)),
   getSession: async (session_id) =>
     unwrap(await authFetch(`/api/flights/${session_id}`)),
+  searches: async (session_id, limit = 20) =>
+    unwrap(await authFetch(`/api/flights/${session_id}/searches?limit=${limit}`)),
   searchAgain: async (session_id, query) =>
     unwrap(
       await authFetch(`/api/flights/${session_id}/search`, {
