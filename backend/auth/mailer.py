@@ -6,6 +6,8 @@ import aiosmtplib
 from dotenv import load_dotenv
 from email.message import EmailMessage
 
+from backend.auth import config
+
 load_dotenv(override=True)
 
 SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
@@ -26,6 +28,9 @@ def _build_message(to: str, subject: str, text: str, html: str) -> EmailMessage:
 
 
 async def send_mail(to: str, subject: str, text: str, html: str) -> None:
+    # Routes gate on MAIL_ENABLED first; this stops any bypass.
+    if not config.MAIL_ENABLED:
+        raise RuntimeError("MAIL_ENABLED is false — email delivery is disabled.")
     if not SMTP_USERNAME or not SMTP_PASSWORD:
         raise RuntimeError("SMTP_USERNAME / SMTP_PASSWORD missing in .env")
     # Gmail shows app passwords as "xxxx xxxx xxxx xxxx" — SMTP needs them spaceless.

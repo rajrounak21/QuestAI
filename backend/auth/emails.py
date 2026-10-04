@@ -6,6 +6,8 @@ Table-based + inline styles for maximum email-client compatibility.
 """
 from __future__ import annotations
 
+import html
+
 PRODUCT = "QuestAI"
 LOGO_URL = "https://plain-apac-prod-public.komododecks.com/202609/25/Vks3Yyo4JP6b6VuUr1UW/image.png"
 ACCENT = "#4f46e5"
@@ -49,9 +51,9 @@ def base_email(
   <tr><td align="center" style="padding: 28px 24px 4px 24px;">
     <img src="{LOGO_URL}" alt="{PRODUCT}" width="140" style="display: block; border: 0;" />
   </td></tr>
-  <tr><td align="center" style="font-size: 20px; font-weight: 700; color: {TEXT}; padding: 14px 24px 2px 24px;">{heading}</td></tr>
+  <tr><td align="center" style="font-size: 20px; font-weight: 700; color: {TEXT}; padding: 14px 24px 2px 24px;">{html.escape(heading)}</td></tr>
   <tr><td style="font-size: 14px; line-height: 1.7; color: {TEXT}; padding: 10px 32px 0 32px;">
-    <p style="margin: 0 0 10px 0;">Hi {name},</p>
+    <p style="margin: 0 0 10px 0;">Hi {html.escape(name)},</p>
     {body_html}
   </td></tr>
   {cta}

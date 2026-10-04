@@ -135,9 +135,29 @@ cd frontend && npm test
 | `JWT_SECRET_KEY` | **yes** | Signs tokens — defaults to `""`, which is an empty HMAC secret, so set it |
 
 Everything else has a working default. Optional groups: Google OAuth, SMTP
-(OTP delivery), and `N8N_SERVICE_KEY` (scheduled job alerts). Without SMTP the
-app runs but cannot deliver a signup code; without Google credentials the OAuth
-button stays hidden.
+(email delivery), and `N8N_SERVICE_KEY` (scheduled job alerts).
+
+### Email (`MAIL_ENABLED`)
+
+`MAIL_ENABLED` is the master switch for all outgoing email. It defaults to
+`false`, so a fresh clone is fully usable with no email configuration:
+
+| | `false` (default) | `true` |
+|---|---|---|
+| Verify banner on `/home` | never shown | shown until verified or skipped |
+| OTP / password-reset email | not sent, clean "disabled" response | sent |
+| Rest of the app | fully working | fully working |
+
+Set it to `true` only after filling in `SMTP_HOST`, `SMTP_PORT`,
+`SMTP_USERNAME` and `SMTP_PASSWORD`. Gmail needs an **App Password**, not your
+account password.
+
+Verification is a request, never a gate — `/login` does not check
+`email_verified`, so "Skip for now" leaves a fully usable account.
+
+Without Google credentials the OAuth button still renders but returns an error
+page. Fill in `GOOGLE_CLIENT_ID` / `GOOGLE_SECRET_KEY` / `GOOGLE_REDIRECT_URI`
+to enable it.
 
 One Groq key covers everything, vision included. Resume upload reads the PDF text
 layer first; a scanned PDF has none, so its pages are rendered to PNG and read by

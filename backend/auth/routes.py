@@ -147,7 +147,7 @@ def refresh(body: RefreshIn):
 
 @router.get("/me")
 def me(user: dict = Depends(get_current_user)):
-    return {"user": user}
+    return {"user": user, "verification_available": config.MAIL_ENABLED}
 
 
 @router.post("/forgot-password")
@@ -163,6 +163,11 @@ async def forgot_password(body: ForgotIn):
         raise HTTPException(status_code=404, detail="Account not found.")
     if not doc.get("hashed_password"):
         raise HTTPException(status_code=400, detail="This account uses Google sign-in. No password to reset.")
+    if not config.MAIL_ENABLED:
+        raise HTTPException(
+            status_code=400,
+            detail="Password reset by email is disabled on this instance.",
+        )
     now = datetime.now(timezone.utc)
     last = doc.get("reset_sent_at")
     if last is not None:
@@ -230,7 +235,7 @@ def reset_password(body: ResetIn):
 @router.post("/request-code")
 async def request_code(body: RequestCodeIn):
     # Generates a 6-digit code (valid OTP_EXPIRE_SEC) and mails it.
-    # Called when the OTP modal opens and on every Resend.
+    # Called from the /home verify banner and on every Resend.
     from backend.auth.emails import verification_email
     from backend.auth.mailer import send_mail
 
@@ -241,6 +246,8 @@ async def request_code(body: RequestCodeIn):
         raise HTTPException(status_code=404, detail="Account not found")
     if doc.get("email_verified"):
         return {"ok": True, "already_verified": True, "email": email}
+    if not config.MAIL_ENABLED:  # before make_otp: never store an unsendable code
+        return {"ok": True, "verification_available": False, "email": email}
     now = datetime.now(timezone.utc)
     last = doc.get("otp_sent_at")
     if last is not None:
@@ -265,7 +272,7 @@ async def request_code(body: RequestCodeIn):
 
 @router.post("/verify-code")
 def verify_code(body: VerifyCodeIn):
-    # Correct code within time -> email_verified:true. Frontend then goes to /login.
+    # Correct code within time -> email_verified:true. No email is sent from here.
     users = get_users_collection()
     email = body.email.lower().strip()
     doc = users.find_one({"email": email})

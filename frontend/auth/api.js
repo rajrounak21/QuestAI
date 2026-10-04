@@ -1,9 +1,16 @@
 // Simple API connection for QuestAI Auth (backend on :8000)
-export const API_BASE = "http://localhost:8000";
+// Set VITE_API_BASE in frontend/.env when the backend is served over a tunnel
+// (ngrok) or a deployed host. Falls back to local dev.
+export const API_BASE = (import.meta.env.VITE_API_BASE || "http://localhost:8000").replace(/\/+$/, "");
+
+// ngrok's free tier puts a browser-warning HTML page (ERR_NGROK_6024) in front of
+// browser traffic and serves it with HTTP 200, so res.json() below would throw
+// on every call. This header skips it. Any other server just ignores it.
+const TUNNEL_HEADERS = { "ngrok-skip-browser-warning": "1" };
 
 function request(path, options = {}) {
   return fetch(`${API_BASE}${path}`, {
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+    headers: { "Content-Type": "application/json", ...TUNNEL_HEADERS, ...(options.headers || {}) },
     ...options,
   })
     .catch(() => {
@@ -85,6 +92,7 @@ async function authedRequest(path, options, json) {
       ...rest,
       headers: {
         ...(json ? { "Content-Type": "application/json" } : {}),
+        ...TUNNEL_HEADERS,
         ...(extraHeaders || {}),
         Authorization: `Bearer ${token}`,
       },

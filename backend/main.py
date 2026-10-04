@@ -27,9 +27,21 @@ from backend.database.collections import ensure_research_indexes, ensure_shoppin
 
 app = FastAPI(title="QuestAI API", version="0.1.0")
 
+_cors_origins = {
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:5173",
+    config.FRONTEND_URL,
+}
+_cors_origins.update(
+    origin.strip()
+    for origin in config.EXTRA_CORS_ORIGINS.split(",")
+    if origin.strip()
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173"],
+    allow_origins=sorted(_cors_origins),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

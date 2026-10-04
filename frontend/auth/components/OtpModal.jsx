@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { authApi } from "../api";
 import { LogoMark } from "./ui";
 
-// Post-signup OTP modal: six boxes, 60s countdown, resend, verify.
-// On correct code -> onVerified() (parent redirects to /login).
+// Verification OTP modal, opened from the /home verify banner.
 export default function OtpModal({ email, onVerified, onClose }) {
   const [digits, setDigits] = useState(["", "", "", "", "", ""]);
   const [status, setStatus] = useState("idle"); // idle | sending | verifying | error
@@ -19,6 +18,12 @@ export default function OtpModal({ email, onVerified, onClose }) {
       const data = await authApi.requestCode(email);
       if (data.already_verified) {
         onVerified();
+        return;
+      }
+      // Banner is hidden when this is false, so reaching here means they disagreed.
+      if (data.verification_available === false) {
+        setStatus("error");
+        setMsg("Email verification is disabled on this instance.");
         return;
       }
       setDigits(["", "", "", "", "", ""]);

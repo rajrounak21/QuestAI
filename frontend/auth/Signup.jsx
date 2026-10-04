@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { authApi, storeRefresh, storeToken } from "./api";
 import AuthLayout from "./components/AuthLayout";
-import OtpModal from "./components/OtpModal";
 import { AuthCard, Divider, GoogleButton, Notice, PrimaryButton, TextField } from "./components/ui";
 
 export default function Signup() {
@@ -16,7 +15,6 @@ export default function Signup() {
   const [notice, setNotice] = useState(null);
   const [suggestSignin, setSuggestSignin] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [verifyEmail, setVerifyEmail] = useState(null); // opens verification modal on success
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -35,9 +33,7 @@ export default function Signup() {
       const data = await authApi.signup(email.trim(), password, name.trim());
       storeToken(data.access_token);
       storeRefresh(data.refresh_token);
-      setPassword("");
-      setConfirm("");
-      setVerifyEmail(data.user.email); // verification modal takes over from here
+      navigate("/home", { replace: true });
     } catch (err) {
       setNotice({ kind: "err", text: err.message });
       if (/already registered/i.test(err.message || "")) setSuggestSignin(true);
@@ -81,13 +77,6 @@ export default function Signup() {
           Already have an account? <Link className="auth-link" to="/login">Sign in</Link>
         </p>
       </AuthCard>
-      {verifyEmail && (
-        <OtpModal
-          email={verifyEmail}
-          onClose={() => setVerifyEmail(null)}
-          onVerified={() => navigate("/home", { replace: true })}
-        />
-      )}
     </AuthLayout>
   );
 }
