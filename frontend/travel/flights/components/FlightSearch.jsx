@@ -143,7 +143,7 @@ export default function FlightSearch({ onSearch, loading, initialQuery = "", ini
             <button key={s} type="button" className="sugg-chip" onClick={() => fillSuggestion(s)} disabled={loading}>{s}</button>
           ))}
         </div>
-        <p className="search-hint"><span className="dot-pulse" /> Live Google Flights results</p>
+        {!loading && <p className="search-hint"><span className="dot-pulse" /> Live Google Flights results</p>}
       </form>
     </div>
   );

@@ -97,7 +97,7 @@ export default function HotelSearch({ onSearch, loading, initialQuery = "", init
             <button key={s} type="button" className="sugg-chip" onClick={() => setLocation(s)} disabled={loading}>{s}</button>
           ))}
         </div>
-        <p className="search-hint"><span className="dot-pulse" /> Live Google Hotels · pick a city, we handle the rest</p>
+        {!loading && <p className="search-hint"><span className="dot-pulse" /> Live Google Hotels · pick a city, we handle the rest</p>}
       </form>
     </div>
   );

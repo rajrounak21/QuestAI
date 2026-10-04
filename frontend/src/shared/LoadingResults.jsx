@@ -15,13 +15,13 @@ export default function LoadingResults({ label = "Searching", rows = 4, estimate
   return (
     <div className="loading-results" role="status" aria-live="polite">
       <p className="loading-results-head">
-        <span className="dot-pulse" />
+        <span className="loading-spinner" />
         {label}
         <span className="loading-results-est">{estimate}</span>
       </p>
       <div className="loading-results-rows">
         {Array.from({ length: rows }).map((_, i) => (
-          <div className="loading-row" key={i} style={{ animationDelay: `${i * 0.08}s` }}>
+          <div className="loading-row" key={i}>
             <span className="loading-block loading-block-thumb" />
             <span className="loading-col">
               <span className="loading-block loading-block-line" />

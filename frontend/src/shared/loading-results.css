@@ -1,5 +1,8 @@
 /* Skeleton shown while a SerpApi search runs. Uses the app's own variables so it
-   matches both themes without a second palette. */
+   matches both themes without a second palette.
+
+   The sweep is the same shimmer shopping already uses - a flat fill with an
+   opacity fade reads as a dead page, which was the point of the complaint. */
 
 .loading-results {
   margin: 18px 0;
@@ -8,16 +11,34 @@
 .loading-results-head {
   display: flex;
   align-items: center;
-  gap: 8px;
-  color: var(--muted);
-  font-size: 0.88rem;
-  margin: 0 0 12px;
+  gap: 10px;
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0 0 14px;
+}
+
+/* A ring you can actually see turning. */
+.loading-spinner {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  border: 2.5px solid var(--line);
+  border-top-color: var(--accent);
+  border-right-color: var(--accent);
+  border-radius: 50%;
+  animation: loadingSpin 0.7s linear infinite;
+}
+
+@keyframes loadingSpin {
+  to { transform: rotate(360deg); }
 }
 
 .loading-results-est {
   margin-left: auto;
-  color: var(--faint);
-  font-size: 0.8rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 400;
 }
 
 .loading-results-rows {
@@ -34,20 +55,21 @@
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--bg1);
-  animation: loadingPulse 1.5s ease-in-out infinite;
 }
 
 .loading-col {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 9px;
   flex: 1;
 }
 
 .loading-block {
   display: block;
   border-radius: 6px;
-  background: var(--soft);
+  background: linear-gradient(90deg, var(--soft) 25%, var(--line) 37%, var(--soft) 63%);
+  background-size: 400% 100%;
+  animation: loadingShimmer 1.4s ease infinite;
 }
 
 .loading-block-thumb {
@@ -65,6 +87,7 @@
 .loading-block-short {
   max-width: 190px;
   height: 9px;
+  animation-delay: 0.12s;
 }
 
 .loading-block-price {
@@ -72,13 +95,15 @@
   height: 15px;
   margin-left: auto;
   flex: 0 0 auto;
+  animation-delay: 0.24s;
 }
 
-@keyframes loadingPulse {
-  0%, 100% { opacity: 0.55; }
-  50% { opacity: 1; }
+@keyframes loadingShimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .loading-row { animation: none; opacity: 0.8; }
+  .loading-spinner { animation-duration: 2.4s; }
+  .loading-block { animation: none; background: var(--soft); }
 }
