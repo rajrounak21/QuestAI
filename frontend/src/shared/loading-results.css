@@ -1,0 +1,78 @@
+/* Skeleton shown while a SerpApi search runs. Uses the app's own variables so it
+   matches both themes without a second palette. */
+
+.loading-results {
+  margin: 18px 0;
+}
+
+.loading-results-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.88rem;
+  margin: 0 0 12px;
+}
+
+.loading-results-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.loading-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg1);
+  animation: loadingPulse 1.5s ease-in-out infinite;
+}
+
+.loading-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.loading-block {
+  display: block;
+  border-radius: 6px;
+  background: var(--soft);
+}
+
+.loading-block-thumb {
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
+  flex: 0 0 auto;
+}
+
+.loading-block-line {
+  height: 11px;
+  max-width: 340px;
+}
+
+.loading-block-short {
+  max-width: 190px;
+  height: 9px;
+}
+
+.loading-block-price {
+  width: 74px;
+  height: 15px;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+@keyframes loadingPulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-row { animation: none; opacity: 0.8; }
+}

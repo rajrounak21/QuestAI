@@ -5,8 +5,34 @@ import { BellIcon, BriefcaseIcon, MenuIcon, SendIcon } from "./components/icons"
 import AgentSelect from "./components/AgentSelect";
 import { AGENT_BY_ID, AGENT_OPTIONS, DEFAULT_AGENT_ID } from "../src/shared/agents";
 import { LogoMark, ThemeToggle } from "./components/ui";
+import OtpModal from "./components/OtpModal";
+import VerifyBanner from "./components/VerifyBanner";
 import Clarifying from "../src/shared/Clarifying";
 import { asksFor } from "../src/shared/agentFields";
+import { mergeFields } from "../src/shared/mergeFields";
+
+const VERIFY_SKIP_KEY = "questai_verify_skipped";
+const readVerifySkipped = () => {
+  try {
+    return localStorage.getItem(VERIFY_SKIP_KEY) === "1";
+  } catch {
+    return false;
+  }
+};
+const writeVerifySkipped = () => {
+  try {
+    localStorage.setItem(VERIFY_SKIP_KEY, "1");
+  } catch {
+    /* private mode / storage disabled — banner simply reappears next visit */
+  }
+};
+const clearVerifySkipped = () => {
+  try {
+    localStorage.removeItem(VERIFY_SKIP_KEY);
+  } catch {
+    /* ignore */
+  }
+};
 
 const AGENT_LABELS = {
   research: "Research",
@@ -16,6 +42,20 @@ const AGENT_LABELS = {
   hotels: "Hotels",
   trips: "Trips",
 };
+
+/**
+ * Naming the step turns a 2-3s pause into something legible. Three anonymous
+ * dots read as a hang; "Finding the right agent" reads as work happening.
+ */
+function thinkingLabel(q = "") {
+  const t = String(q).toLowerCase();
+  if (/\b(flight|fly|flying|airline|ticket)\b/.test(t)) return "Looking for flights\u2026";
+  if (/\b(hotel|hostel|resort|stay|staying)\b/.test(t)) return "Looking for stays\u2026";
+  if (/\b(job|career|hiring|internship|vacancy|recruit)\b/.test(t)) return "Looking for roles\u2026";
+  if (/\b(buy|shop|purchase|price|cheapest|product|budget)\b/.test(t)) return "Looking for products\u2026";
+  if (/\b(trip|itinerary|holiday|vacation|plan)\b/.test(t)) return "Planning the route\u2026";
+  return "Finding the right agent\u2026";
+}
 
 const NAV = ["Home", "Research", "Travel", "Shopping", "Jobs"];
 const NAV_PATH = {
@@ -152,6 +192,9 @@ const [activity, setActivity] = useState([]);
   // asker renders in the chat area instead of navigating, so the user never
   // reaches a form they would only have to come back from.
   const [pendingRoute, setPendingRoute] = useState(null);
+  const [mailEnabled, setMailEnabled] = useState(false);
+  const [verifyDismissed, setVerifyDismissed] = useState(readVerifySkipped);
+  const [verifyOpen, setVerifyOpen] = useState(false);
   // One ask per distinct question. Without this, re-submitting the same
   // sentence would loop: route -> ask -> answer -> route -> ask.
   const askedRef = useRef(new Set());
@@ -184,6 +227,7 @@ const [activity, setActivity] = useState([]);
         }
         const data = await res.json();
         setUser(data.user);
+        setMailEnabled(Boolean(data.verification_available));
         setLoading(false);
         // Jobs is in this list too — omitting it was why job searches never
         // appeared in Recent activity.
@@ -260,6 +304,29 @@ const [activity, setActivity] = useState([]);
     clearAuth();
     navigate("/login", { replace: true });
   };
+
+  const skipVerify = () => {
+    writeVerifySkipped();
+    setVerifyDismissed(true);
+  };
+
+  // Escape hatch for "Skip for now": the banner is gone but verification is
+  // still possible from the profile menu, so the skip is never a dead end.
+  const startVerify = () => {
+    clearVerifySkipped();
+    setVerifyDismissed(false);
+    setProfile(false);
+    setVerifyOpen(true);
+  };
+
+  const onVerified = () => {
+    setUser((u) => (u ? { ...u, email_verified: true } : u));
+    setVerifyOpen(false);
+  };
+
+  const showVerifyBanner = Boolean(
+    user && !user.email_verified && mailEnabled && !verifyDismissed && !verifyOpen
+  );
 
   const submit = (e) => {
     e.preventDefault();
@@ -350,45 +417,55 @@ const [activity, setActivity] = useState([]);
   };
 
   /**
-   * Answers from the inline asker are folded back into the original question and
-   * re-routed rather than merged client-side. Going through the router again
-   * means the answers get the same normalisation as everything else - a typed
-   * "5 Jan" becomes 2027-01-05 because _clean_payload coerces it, which a local
-   * merge could not do.
+   * Answers are merged straight into the fields the router already returned and
+   * the user is handed over immediately.
+   *
+   * This used to re-route the combined text through the model, which cost a
+   * second 1.5-3.6s call after the user had already answered - the single worst
+   * pause in the flow, since it happened while they were waiting on nothing.
+   * Re-routing was only buying normalisation, and the asker needs none: date
+   * fields use <input type="date"> so they are already YYYY-MM-DD.
+   *
+   * Correctness is not left to the merge. The destination form's own `valid`
+   * expression is the final gate before any search fires, so an answer that
+   * cannot be used (a budget of "mid-range") leaves the form unsubmittable
+   * rather than triggering a run on junk.
    */
   const handleAnswers = (answerLines) => {
     if (!pendingRoute) return;
-    const combined = `${pendingRoute.q}\n${answerLines}`;
-    setThinking(true);
+    const { route, q, agent } = pendingRoute;
+
+    const answers = {};
+    for (const line of String(answerLines || "").split("\n")) {
+      const i = line.indexOf(":");
+      if (i > 0) answers[line.slice(0, i).trim()] = line.slice(i + 1).trim();
+    }
+
+    const fields = mergeFields(route.fields || {}, answers);
+    const answered = Object.keys(answers);
+    const receipt = { ...(route.receipt || {}) };
+
+    // Keep the receipt honest - it would otherwise still say the date is needed
+    // on the page the user is about to land on.
+    if (Array.isArray(receipt.missing)) {
+      receipt.missing = receipt.missing.filter((f) => !answered.includes(f));
+    }
+    receipt.understood = { ...(receipt.understood || {}), ...answers };
+
     setPendingRoute(null);
-    setThinking(true);
-    routeIntent(combined)
-      .then((d) => {
-        if (d.unauthorized) {
-          navigate("/login", { replace: true });
-          return;
-        }
-        if (d.networkError) throw new Error("Cannot reach the server. Is the backend running?");
-        if (d.agent === "assistant" || !d.path) {
-          throw new Error("Could not work out where to send that. Try rephrasing.");
-        }
-        const missing = d.receipt?.missing || [];
-        navigate(`${d.path}?q=${encodeURIComponent(combined)}`, {
-          state: {
-            prefill: {
-              agent: d.agent,
-              query: combined,
-              fields: d.fields || {},
-              receipt: d.receipt || null,
-              reason: d.reason || "",
-              confidence: typeof d.confidence === "number" ? d.confidence : null,
-              autoRun: missing.length === 0,
-            },
-          },
-        });
-      })
-      .catch((err) => setRouteError(err.message || "Could not reach the assistant."))
-      .finally(() => setThinking(false));
+    navigate(`${route.path}?q=${encodeURIComponent(q)}`, {
+      state: {
+        prefill: {
+          agent,
+          query: q,
+          fields,
+          receipt: Object.keys(receipt).length ? receipt : null,
+          reason: route.reason || "",
+          confidence: typeof route.confidence === "number" ? route.confidence : null,
+          autoRun: true,
+        },
+      },
+    });
   };
 
   if (loading) {
@@ -460,6 +537,11 @@ const [activity, setActivity] = useState([]);
                 {["Profile", "Settings", "Alerts"].map((x) => (
                   <button key={x} className="dash-menuitem" onClick={() => setProfile(false)}>{x}</button>
                 ))}
+                {mailEnabled && !user.email_verified && (
+                  <button className="dash-menuitem" onClick={startVerify}>
+                    Verify email
+                  </button>
+                )}
                 <div className="dash-menudiv" />
                 <button className="dash-menuitem" onClick={logout}>Sign out</button>
               </div>
@@ -470,6 +552,14 @@ const [activity, setActivity] = useState([]);
       </header>
 
       <main className="dash-main dash-wide">
+        {showVerifyBanner && (
+          <VerifyBanner
+            email={user.email}
+            onVerify={() => setVerifyOpen(true)}
+            onSkip={skipVerify}
+          />
+        )}
+
         <section className="dash-hero">
           <h1>{greeting().greet}, {firstName}</h1>
           <p className="auth-sub">{greeting().sub}</p>
@@ -508,10 +598,11 @@ const [activity, setActivity] = useState([]);
 
               {thinking && (
                 <div className="dash-chat-row">
-                  <span className="dash-chat-bubble dash-chat-bubble-bot">
+                  <span className="dash-chat-bubble dash-chat-bubble-bot dash-chat-bubble-thinking">
                     <span className="dash-chat-dots">
                       <i /><i /><i />
                     </span>
+                    <span className="dash-thinking-label">{thinkingLabel(query)}</span>
                   </span>
                 </div>
               )}
@@ -646,6 +737,14 @@ const [activity, setActivity] = useState([]);
           </div>
         </section>
       </main>
+
+      {verifyOpen && user && (
+        <OtpModal
+          email={user.email}
+          onVerified={onVerified}
+          onClose={() => setVerifyOpen(false)}
+        />
+      )}
     </div>
   );
 }
