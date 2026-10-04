@@ -195,9 +195,6 @@ const [activity, setActivity] = useState([]);
   const [mailEnabled, setMailEnabled] = useState(false);
   const [verifyDismissed, setVerifyDismissed] = useState(readVerifySkipped);
   const [verifyOpen, setVerifyOpen] = useState(false);
-  // One ask per distinct question. Without this, re-submitting the same
-  // sentence would loop: route -> ask -> answer -> route -> ask.
-  const askedRef = useRef(new Set());
 
   useEffect(() => {
     if (!getToken()) {
@@ -379,9 +376,16 @@ const [activity, setActivity] = useState([]);
         // Ask before navigating when a required field is missing, so the user
         // answers in their own words instead of landing on a half-filled form.
         // The router told us exactly what it could not get.
+        //
+        // No repeat-ask guard here. There used to be one, because answering
+        // re-routed the combined text through the model and could come back
+        // still missing something - route, ask, answer, ask again. handleAnswers
+        // merges and navigates directly now, so that loop cannot happen, and the
+        // guard only did harm: dismissing the question added the query to a Set
+        // that lived for the page, so the same question never asked again and the
+        // user was silently dropped onto a form whose Search button was disabled.
         const missing = d.receipt?.missing || [];
-        if (missing.length > 0 && !askedRef.current.has(q)) {
-          askedRef.current.add(q);
+        if (missing.length > 0) {
           setPendingRoute({ route: d, q, agent: d.agent });
           return;
         }
