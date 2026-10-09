@@ -35,7 +35,6 @@ actual research, and **every single search in the product runs through
 - [Architecture](#architecture)
 - [API surface](#api-surface)
 - [Project layout](#project-layout)
-- [Tests](#tests)
 - [Troubleshooting](#troubleshooting)
 - [License](#license)
 
@@ -101,14 +100,8 @@ npm install
 npm run dev
 ```
 
-Open **http://localhost:5173** and sign up.
-
-### 3. Verify it works
-
-```bash
-# Frontend integrity checks (no network, no API keys needed)
-cd frontend && npm test
-```
+Open **http://localhost:5173** and sign up. `GET /health` on the backend should
+list all ten services before you start clicking around.
 
 ---
 
@@ -472,21 +465,6 @@ frontend/src/
   research/ shopping/ travel/ jobs/
   shared/                  agents registry, useRouterPrefill, api client
 ```
-
----
-
-## Tests
-
-```bash
-cd frontend && npm test
-```
-
-No network and no API keys needed. Three suites:
-- `test_agents.cjs` — the frontend agent registry and the backend catalog agree:
-  ids are unique, every agent is selectable, and every path matches
-- `test_merge_fields.cjs` — router fields merge with per-page parsers, and the
-  router wins on conflict
-- `test_currency.cjs` — budget parsing (symbols, `k` suffixes, bare numbers)
 
 ---
 

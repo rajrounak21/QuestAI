@@ -6,8 +6,7 @@
   "scripts": {
     "dev": "vite --port 5173",
     "build": "vite build",
-    "preview": "vite preview",
-    "test": "node src/shared/test_agents.cjs && node src/shared/test_merge_fields.cjs && node src/shared/test_currency.cjs"
+    "preview": "vite preview"
   },
   "dependencies": {
     "framer-motion": "^13.4.3",
