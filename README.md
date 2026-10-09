@@ -108,11 +108,6 @@ Open **http://localhost:5173** and sign up.
 ```bash
 # Frontend integrity checks (no network, no API keys needed)
 cd frontend && npm test
-
-# Confirm the research parsers match live SerpApi responses.
-# Costs 3 searches.
-.venv/bin/python -m backend.agents.research.tools.verify_parsers
-# Windows: .venv\Scripts\python.exe -m backend.agents.research.tools.verify_parsers
 ```
 
 ---
@@ -341,8 +336,8 @@ on it.
 
 `google_news` returns no article text, and `google_scholar` puts the publication
 year inside a citation string rather than a `year` field. Both are handled in
-`search.py` and both are covered by `verify_parsers.py`, which asserts that
-every engine survives the downstream `process_sources()` filter.
+`search.py`, so every engine still survives the downstream `process_sources()`
+filter.
 
 ---
 
@@ -492,13 +487,6 @@ No network and no API keys needed. Three suites:
 - `test_merge_fields.cjs` — router fields merge with per-page parsers, and the
   router wins on conflict
 - `test_currency.cjs` — budget parsing (symbols, `k` suffixes, bare numbers)
-
-On the backend, `verify_parsers` checks the research parsers against live SerpApi
-response shapes and confirms every engine produces at least one source that
-survives `process_sources()`. Costs 3 searches. It exists because those parsers
-originally shipped unverified, which turned out to matter: `google_news` returns
-no `snippet`, and `process_sources()` discards sources with an empty snippet, so
-the entire news branch was being dropped without any error being raised.
 
 ---
 
