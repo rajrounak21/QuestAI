@@ -1,6 +1,6 @@
 # QuestAI
 
-**One AI superapp. Four specialist agents behind a single universal layer.**
+**One AI superapp. Six specialist agents behind a single universal layer.**
 
 You type a task in plain language. A universal routing layer decides which
 specialist should handle it, pre-extracts that specialist's form fields, and
@@ -28,6 +28,7 @@ actual research, and **every single search in the product runs through
 - [Why this exists](#why-this-exists)
 - [Quick start](#quick-start)
 - [Environment variables](#environment-variables)
+- [Job alerts with n8n](#job-alerts-with-n8n)
 - [SerpApi usage](#serpapi-usage)
 - [The universal layer](#the-universal-layer)
 - [The six agent graphs](#the-six-agent-graphs)
@@ -35,6 +36,7 @@ actual research, and **every single search in the product runs through
 - [API surface](#api-surface)
 - [Project layout](#project-layout)
 - [Tests and verification](#tests-and-verification)
+- [Troubleshooting](#troubleshooting)
 - [License](#license)
 
 ---
@@ -46,9 +48,9 @@ Most AI products make you choose a tool before you can start. You pick
 actual question is simpler than the form.
 
 QuestAI inverts that. You describe the outcome you want; the routing layer picks
-the specialist and pre-fills what it can infer. The four user-facing
-experiences are **Research, Travel, Shopping and Jobs** — Travel covers flights,
-hotels and full itineraries through three graphs.
+the specialist and pre-fills what it can infer. There are six agents —
+**Research, Trips, Flights, Hotels, Shopping and Jobs** — behind five tabs, since
+the three travel agents share one Travel tab.
 
 ---
 
@@ -77,7 +79,10 @@ python -m venv .venv
 pip install -r requirements.txt
 
 cp .env.example .env     # Windows: copy .env.example .env
-# then fill in the four REQUIRED values in .env
+# then fill in the four REQUIRED values in .env.
+# Nothing else is needed: email, Google OAuth and n8n are all optional.
+# Do NOT set MAIL_ENABLED=true unless you are configuring SMTP — signup and
+# login work with no email setup at all.
 
 uvicorn backend.main:app --port 8000
 ```
@@ -98,18 +103,7 @@ npm run dev
 
 Open **http://localhost:5173** and sign up.
 
-### 3. Landing site (optional)
-
-A separate static marketing site with no backend or auth. It is also served at
-`/` inside the app, so you only need this to work on the site standalone.
-
-```bash
-cd landing
-npm install
-npm run dev     # http://localhost:5174
-```
-
-### 4. Verify it works
+### 3. Verify it works
 
 ```bash
 # Frontend integrity checks (no network, no API keys needed)
@@ -136,6 +130,32 @@ cd frontend && npm test
 
 Everything else has a working default. Optional groups: Google OAuth, SMTP
 (email delivery), and `N8N_SERVICE_KEY` (scheduled job alerts).
+
+### Email is off by default — use it that way
+
+`.env.example` ships `MAIL_ENABLED=false`, and that is the recommended setup for
+running and evaluating the app. **Leave it false.** Normal signup and login work
+exactly as they do with email enabled:
+
+- `POST /api/auth/signup` returns access + refresh tokens immediately
+- `POST /api/auth/login` returns them immediately
+- No OTP, no confirmation link, no SMTP account needed
+
+There is no verification gate anywhere in the login path. What turns off with
+`MAIL_ENABLED=false`:
+
+| Feature | With `MAIL_ENABLED=false` |
+|---|---|
+| Signup / login / logout / refresh | fully working |
+| Every agent and all six graphs | fully working |
+| Verify banner on `/home` | never shown |
+| Email OTP on signup | not sent, signup just succeeds |
+| Forgot password by email | returns 400 "disabled on this instance" |
+| Google OAuth | unaffected, controlled by its own variables |
+
+So: sign up with any email and password of 6+ characters, and you are in. If you
+forgot a password, set `MAIL_ENABLED=true` first and configure SMTP — there is no
+other reset path.
 
 ### Email (`MAIL_ENABLED`)
 
@@ -165,21 +185,131 @@ layer first; a scanned PDF has none, so its pages are rendered to PNG and read b
 
 ---
 
+## Job alerts with n8n
+
+A user creates an alert in the Jobs page (roles, locations, email, schedule). The
+backend stores it and schedules it. **n8n is the piece that actually fires it** —
+it polls for alerts that are due, runs each one, and emails the result.
+
+Two endpoints do this. They are the only routes in the app that are **not**
+authenticated with a user JWT:
+
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/api/jobs/alerts/due` | `GET` | Alerts whose `next_run_at` has passed |
+| `/api/jobs/alerts/{alert_id}/run` | `POST` | Run one alert, return its new jobs |
+
+They take `X-Service-Key` instead, checked against `N8N_SERVICE_KEY` in constant
+time. The split is deliberate: `GET /alerts` returns every user's email address
+and `/{id}/run` spends SerpApi quota, so an open door here is not an option. If
+`N8N_SERVICE_KEY` is unset these routes fail closed with a 503 rather than
+allowing anything through.
+
+### 1. Expose the backend
+
+n8n runs on its own machine, so `localhost:8000` will not reach it. Use a tunnel
+(any of these work):
+
+```bash
+ngrok http 8000
+# or
+cloudflared tunnel --url http://localhost:8000
+```
+
+Copy the HTTPS URL it prints.
+
+### 2. Import the workflow
+
+`Job Alert System.json` in the repo root is the ready workflow. In n8n:
+**Workflows → Import from File** and select it.
+
+### 3. Set the two variables it needs
+
+The workflow ships with placeholders so it is safe to commit. Set these inside
+n8n (**Settings → Variables**, both flagged as available everywhere):
+
+| Variable | Value |
+|---|---|
+| `QUESTAI_BACKEND_URL` | The tunnel URL from step 1, with no trailing slash |
+| `N8N_SERVICE_KEY` | The **same** value you set as `N8N_SERVICE_KEY` in `.env` |
+
+That key must match, or every request returns 403.
+
+### 4. Connect Gmail
+
+The **Send Job Alert Email** node uses n8n's built-in Gmail node. Select it and
+pick your Gmail credential — **Import from Google** is the fastest path. Then
+replace the `To` field with `{{ $json.email }}` so it goes to the user who set the
+alert rather than to you.
+
+### 5. Activate
+
+Toggle the workflow to **Active**. It runs every 5 minutes on a schedule trigger,
+polls `/alerts/due`, and loops over whatever comes back. Alerts with nothing new
+skip the email.
+
+### Testing without waiting 5 minutes
+
+```bash
+# Make an alert due right now, with your own email and target role:
+curl -H "X-Service-Key: <your key from .env>" \
+  "http://localhost:8000/api/jobs/alerts/due?now=2026-09-25T09:01:00+05:30"
+
+# Then run it through the local tunnel:
+curl -X POST -H "X-Service-Key: <your key>" \
+  "<tunnel-url>/api/jobs/alerts/<alert_id>/run"
+```
+
+The `?now=` parameter is optional and exists only for testing — it overrides what
+"due" means.
+
+### How the workflow runs
+
+```
+Every 5 Minutes  ──▶  Get Due Alerts  ──▶  Split Due Alerts
+                                                      │
+                                              Loop Over Alerts
+                                                      │
+                                    ┌─────────────────┴──────────────────┐
+                                    ▼                                    ▼
+                               Run Alert                          (next alert)
+                                    │
+                            Has New Jobs?
+                              │          │
+                             yes         no
+                              ▼          ▼
+                       Build Email    skip
+                              │
+                       Send Job Alert Email
+```
+
+**Everything is optional except the backend.** A fresh clone works fully without
+n8n — alerts are stored and editable, they just never fire on a schedule. The
+in-app "run now" path does not need n8n either.
+
+---
+
 ## SerpApi usage
 
 SerpApi is not an add-on here — it is the product's entire search surface.
-Eight engines across ten call sites:
+Eight engines across six tool modules:
 
 | Engine | Agent | Implementation |
 |---|---|---|
-| `google` | Research | `backend/agents/research/tools/search.py:67` |
-| `google_scholar` | Research | `backend/agents/research/tools/search.py:94` |
-| `google_news` | Research | `backend/agents/research/tools/search.py:137` |
-| `google_shopping` | Shopping | `backend/agents/shopping/tools/google_shopping.py:30` |
-| `amazon` | Shopping | `backend/agents/shopping/tools/amazon.py:29` |
-| `google_flights` | Travel | `backend/agents/travel/tools/google_flights.py:45` |
-| `google_hotels` | Travel | `backend/agents/travel/tools/google_hotels.py:46` |
-| `google_jobs` | Jobs | `backend/agents/job/tools/google_jobs.py:242` |
+| `google` | Research | `research/tools/search.py` — `google_search` |
+| `google_scholar` | Research | `research/tools/search.py` — `google_scholar_search` |
+| `google_news` | Research | `research/tools/search.py` — `google_news_search` |
+| `google_shopping` | Shopping | `shopping/tools/google_shopping.py` |
+| `amazon` | Shopping | `shopping/tools/amazon.py` |
+| `google_flights` | Travel | `travel/tools/google_flights.py` |
+| `google_hotels` | Travel | `travel/tools/google_hotels.py` |
+| `google_jobs` | Jobs | `job/tools/google_jobs.py` |
+
+Every non-jobs engine goes through one shared client,
+`backend/agents/shared/serpapi_client.py`, which owns the shared connection and
+retries one transient provider failure (429/5xx/timeout). A 400 is never
+retried — the request itself is wrong, so a retry would burn a credit to fail
+identically. Jobs keeps its own client.
 
 Two integrations are worth calling out, because they are the parts that are easy
 to get wrong:
@@ -192,16 +322,20 @@ departure_token  ──▶  return-leg options  ──▶  booking_token  ──
         google_flights           google_flights              google_flights         google_flights
 ```
 
-Implemented at `google_flights.py:45`, `:92` and `:134`. Each extra step costs
-another SerpApi credit, so the code deliberately never calls them speculatively.
+Implemented as `search_flights`, `get_return_leg_options` and
+`get_booking_options` in `google_flights.py`. Each extra step costs another SerpApi
+credit, so the code deliberately never calls them speculatively.
 
 **Google Jobs retries unresolvable locations — but only on a 400.** SerpApi does
 not fuzzy-match a location it cannot resolve; it returns a bad-request error.
-`google_jobs.py:254-279` retries with corrected spellings, and it distinguishes
-a bad location from a quota, network or auth failure so those surface
-immediately instead of burning the retry budget. Up to three searches are then
-run in parallel with `ThreadPoolExecutor`, preserving input order because the
-normalizer depends on it.
+`google_jobs.py` retries with corrected spellings, and it distinguishes a bad
+location from a quota, network or auth failure so those surface immediately
+instead of burning the retry budget. Up to three searches are then run in parallel
+with `ThreadPoolExecutor`, preserving input order because the normalizer depends
+on it.
+
+> Jobs needs a resolvable location. `remote` on its own returns nothing, because
+> Google matches on a city or region, not a work mode.
 
 ### Response shapes
 
@@ -262,6 +396,11 @@ feedback loops.
 | **Hotels** | 3 | 1 | `extract_params → validate_params → search_hotels` |
 | **Shopping** | 3 | 1 | `extract_params → validate_params → search_shopping` — no LLM in the loop |
 
+Flights and Hotels share one graph builder (`travel/agent/graph.py`) that
+registers the same three node names twice — once bound to the flight tools, once
+to the hotel tools — so each search runs a three-node path. Trips is its own
+eight-node graph in `trip_graph.py`.
+
 Two patterns are worth noting:
 
 - **Research is self-critical.** `gap_analyzer` inspects what was collected and
@@ -284,7 +423,6 @@ requests. Every agent's session history supports delete.
 
 ```
 frontend/  React 19 + Vite (port 5173) — app, auth, all six agent UIs
-landing/   React 19 + Vite (port 5174) — standalone static marketing site
 backend/   FastAPI + LangGraph (port 8000)
              auth/          JWT + refresh, bcrypt, email OTP, Google OAuth
              agents/
@@ -338,31 +476,76 @@ frontend/src/
   auth/                    login, signup, Home (the universal entry point)
   research/ shopping/ travel/ jobs/
   shared/                  agents registry, useRouterPrefill, api client
-landing/src/landing/       standalone marketing site
 ```
 
 ---
 
 ## Tests and verification
 
+### Frontend — no network, no API keys
+
 ```bash
 cd frontend && npm test
 ```
 
-Checks that the frontend agent registry and the backend router agree — ids are
-unique, every agent is selectable, and every path matches `catalog.py`. Pure
-Node, no network, no API keys.
+Three suites:
+- `test_agents.cjs` — the frontend agent registry and the backend catalog agree:
+  ids are unique, every agent is selectable, and every path matches
+- `test_merge_fields.cjs` — router fields merge with per-page parsers, and the
+  router wins on conflict
+- `test_currency.cjs` — budget parsing (symbols, `k` suffixes, bare numbers)
+
+### Backend
+
+Each is runnable on its own. Costs are noted per command.
 
 ```bash
+# SerpApi retry policy. Stubs the provider, so 0 credits.
+.venv/bin/python -m backend.agents.shared.verify_serpapi_retry
+
+# Research evidence cache: a repeat query spends no search. Costs 1.
+.venv/bin/python -m backend.agents.shared.verify_cache
+
+# Research parsers against live SerpApi shapes. Costs 3.
 .venv/bin/python -m backend.agents.research.tools.verify_parsers
+
+# Trip graph: past-date guard, parallel dispatch, currency, warnings,
+# IATA resolution, and the clarification loop. No live searches.
+.venv/bin/python -m backend.agents.travel.tests.verify_trip_speed
+
+# Trip revision hashing and derived return dates. No live searches.
+.venv/bin/python -m backend.agents.travel.tests.verify_trip_revision
+
+# A failed turn persists and is retryable. No live searches.
+.venv/bin/python -m backend.agents.travel.tests.verify_failed_run
+
+# Follow-up JSON extraction (the models that previously truncated). No live searches.
+.venv/bin/python -m backend.agents.travel.tests.verify_json_followup
+
+# Trip history route and payload. Needs a running backend.
+.venv/bin/python -m backend.agents.travel.tests.verify_history_route
 ```
 
-Live check that the three research parsers match current SerpApi response shapes
-**and** that every engine produces at least one source that survives
-`process_sources()`. Costs 3 searches. This exists because those parsers
-originally shipped unverified, which turned out to matter: `google_news` returns
-no `snippet`, and `process_sources()` discards sources with an empty snippet, so
-the entire news branch was being dropped without any error being raised.
+`verify_parsers` exists because those parsers originally shipped unverified,
+which turned out to matter: `google_news` returns no `snippet`, and
+`process_sources()` discards sources with an empty snippet, so the entire news
+branch was being dropped without any error being raised.
+
+---
+
+## Troubleshooting
+
+| Symptom | Cause |
+|---|---|
+| `/health` ok, every authenticated request 401/403 | JWT secret is the default `""`. Set `JWT_SECRET_KEY`. |
+| Auth works, SerpApi calls return 403 | `SERP_API_KEY` is wrong or expired. |
+| Everything works on localhost, not from n8n | n8n needs a public URL. Use a tunnel and update `QUESTAI_BACKEND_URL`. |
+| n8n requests return 403 | `N8N_SERVICE_KEY` in n8n does not match the one in `.env`. |
+| n8n requests return 503 | `N8N_SERVICE_KEY` is unset in `.env`. These routes fail closed on purpose. |
+| Mongo queries hang | Atlas cluster is not allowing your IP. Add it to the access list. |
+| Job search returns 0 results | Google Jobs needs a resolvable location. "remote" alone is not a city — include a real one. |
+| Resume parses but finds nothing | The profile needs skills, which come from the resume text or vision pass. |
+| Forgot password, reset returns 400 | `MAIL_ENABLED` is `false`. Password reset is the one feature that needs real email. |
 
 ---
 

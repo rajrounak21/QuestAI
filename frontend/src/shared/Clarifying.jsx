@@ -59,10 +59,15 @@ export default function Clarifying({ questions, message, loading, onAnswer, subm
                 q.placeholder ||
                 (q.inputType === "date" ? "" : "Type your answer\u2026")
               }
+              min={q.min || undefined}
+              max={q.max || undefined}
               value={answers[q.field] || ""}
               disabled={loading}
               onChange={(e) => set(q.field, e.target.value)}
             />
+            {q.inputType === "date" && !q.min && (
+              <p className="trip-q-why">Pick a date from the calendar.</p>
+            )}
           </div>
         ))}
         <button type="submit" className="search-btn" disabled={loading || !canSend}>

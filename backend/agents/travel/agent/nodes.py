@@ -14,6 +14,7 @@ if _project_root not in sys.path:
 
 from backend.agents.travel.agent.state import FlightState, HotelState, TripState
 from backend.agents.research.services.llm import init_llm, init_llm_light
+from backend.agents.shared.json_llm import JsonCallFailed, invoke_json
 
 logger = logging.getLogger(__name__)
 
@@ -230,10 +231,9 @@ def extract_trip_params_node(state: TripState) -> dict[str, Any]:
     )
 
     try:
-        llm = init_llm_light(temperature=0.0, max_tokens=1024)
-        raw = llm.invoke(prompt)
-        text = raw.content if hasattr(raw, "content") else str(raw)
-        params = _parse_json(text)
+        params, meta = invoke_json(prompt, max_tokens=1024, agent="trip-extract")
+        if meta.get("truncated"):
+            logger.warning("Trip extraction needed a larger budget; recovered on retry")
 
         if "error" in params:
             return {
@@ -246,11 +246,26 @@ def extract_trip_params_node(state: TripState) -> dict[str, Any]:
             "progress_steps": ["Extracted trip parameters from your request"],
         }
 
-    except Exception as e:
-        logger.error(f"LLM extraction failed: {e}")
+    except JsonCallFailed as e:
+        if e.truncated:
+            logger.error("Trip extraction ran out of token budget: %s", e)
+            return {
+                "error": (
+                    "I could not process that message - my reply was cut off. "
+                    "Please try again."
+                ),
+                "progress_steps": ["Error: response budget exhausted"],
+            }
+        logger.error("Trip extraction failed: %s", e)
         return {
             "error": "I couldn't understand your trip request. Please try rephrasing.",
             "progress_steps": ["Error: could not understand request"],
+        }
+    except Exception as e:
+        logger.error(f"Trip extraction failed unexpectedly: {e}")
+        return {
+            "error": "Something went wrong reading your request. Please try again.",
+            "progress_steps": ["Error: extraction failed"],
         }
 
 
@@ -325,10 +340,9 @@ def validate_trip_params_node(state: TripState) -> dict[str, Any]:
     )
 
     try:
-        llm = init_llm_light(temperature=0.0, max_tokens=1024)
-        raw = llm.invoke(prompt)
-        text = raw.content if hasattr(raw, "content") else str(raw)
-        result = _parse_json(text)
+        result, meta = invoke_json(prompt, max_tokens=1024, agent="trip-validate")
+        if meta.get("truncated"):
+            logger.warning("Trip validation needed a larger budget; recovered on retry")
 
         if result.get("is_complete"):
             logger.info("Trip parameters are complete")
@@ -347,6 +361,16 @@ def validate_trip_params_node(state: TripState) -> dict[str, Any]:
             "progress_steps": [f"Need more info: {', '.join(q.get('field', '?') for q in questions)}"],
         }
 
+    except JsonCallFailed as e:
+        logger.error(f"Trip validation response budget exhausted: {e}")
+        return {
+            "clarifying_questions": [],
+            "message": (
+                "I could not finish checking your trip details - my reply was "
+                "cut off. Please send your request again."
+            ),
+            "progress_steps": ["Validation budget exhausted"],
+        }
     except Exception as e:
         logger.error(f"Validation failed: {e}")
         return {
@@ -434,9 +458,6 @@ def detect_impact_node(state: TripState) -> dict[str, Any]:
 
     from backend.database.trip_sessions import build_trip_context
 
-    # Same curated context the router sends to extract: params, budget
-    # actuals, picks, day-titles+costs, recent turns. No images, tokens,
-    # hashes, evidence, or research dumps — ever.
     current_state_text = json.dumps(
         build_trip_context(trip_session or {}), ensure_ascii=False
     )
@@ -450,10 +471,9 @@ def detect_impact_node(state: TripState) -> dict[str, Any]:
     )
 
     try:
-        llm = init_llm_light(temperature=0.0, max_tokens=512)
-        raw = llm.invoke(prompt)
-        text = raw.content if hasattr(raw, "content") else str(raw)
-        impact = _parse_json(text)
+        impact, meta = invoke_json(prompt, max_tokens=1024, agent="trip-impact")
+        if meta.get("truncated"):
+            logger.warning("Impact detection needed a larger budget; recovered on retry")
 
         changes = impact.get("changes", {})
         response = impact.get("response", "")
@@ -484,12 +504,12 @@ def detect_impact_node(state: TripState) -> dict[str, Any]:
         }
 
     except Exception as e:
-        logger.error(f"Impact detection failed: {e}")
+        logger.error(f"Impact detection failed, applying changes without refreshing: {e}")
         return {
             "impact_analysis": {
-                "affected_agents": ["flights", "hotels", "research", "itinerary"],
+                "affected_agents": [],
                 "changes": {},
                 "response": "",
             },
-            "progress_steps": ["Re-running all searches"],
+            "progress_steps": ["Applied your change without re-running searches"],
         }

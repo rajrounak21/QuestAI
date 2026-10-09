@@ -104,6 +104,64 @@
 .trip-status.failed {
    color: #ef4444;
 }
+
+/* A failed revision, attached to the turn that failed. Distinct from the
+   status pill so a live itinerary plus a failed change is readable. */
+.trip-failed {
+   margin-top: 10px;
+   padding-top: 10px;
+   border-top: 1px dashed var(--line);
+}
+.trip-failed-msg {
+   margin: 0 0 8px;
+   color: #ef4444;
+   font-size: 0.85rem;
+}
+.trip-failed-actions {
+   display: flex;
+   gap: 8px;
+   flex-wrap: wrap;
+}
+
+/* Inline "edit & resend" - the message that failed is pre-filled so the user
+   adjusts it instead of retyping. */
+.trip-edit {
+   display: flex;
+   flex-direction: column;
+   gap: 6px;
+}
+.trip-edit-label {
+   font-size: 0.78rem;
+   color: var(--muted);
+}
+.trip-edit-input {
+   width: 100%;
+   padding: 8px 10px;
+   border: 1px solid var(--line);
+   border-radius: 10px;
+   background: var(--bg2, var(--bg1));
+   color: var(--text);
+   font: inherit;
+   font-size: 0.85rem;
+   resize: vertical;
+}
+.trip-edit-input:focus {
+   outline: 2px solid var(--accent);
+   outline-offset: 1px;
+}
+.trip-edit-actions {
+   display: flex;
+   gap: 8px;
+}
+.trip-failed .btn-again:disabled,
+.trip-edit-actions .btn-again:disabled {
+   opacity: 0.55;
+   cursor: not-allowed;
+}
+/* Echo that is no longer in flight - the send never reached the server. */
+.bubble-time.failed {
+   color: #ef4444;
+}
 .trip-budget {
    margin-top: 12px;
 }

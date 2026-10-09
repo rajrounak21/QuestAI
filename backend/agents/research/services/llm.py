@@ -12,6 +12,8 @@ MODEL = "openai/gpt-oss-120b"
 MODEL_LIGHT = "openai/gpt-oss-20b"
 MODEL_QWEN = "qwen/qwen3.8-27b"
 
+MODEL_JSON = MODEL_QWEN
+
 _last_invoke_time: float = 0.0
 _INVOKE_DELAY: float = 0.1
 

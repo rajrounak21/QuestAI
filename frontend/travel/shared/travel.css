@@ -1193,6 +1193,344 @@
   overflow: hidden;
 }
 
+/* --- Trip history card ---------------------------------------------------
+   A saved trip is a journey, so the card shows the journey: a hero of where
+   you are going, the airport codes you would actually book, and the trip's
+   facts.
+
+   It previously rendered the title "Mumbai" for a Delhi->Mumbai trip, twice
+   over, which told the user nothing when two saved trips ended in the same
+   city. The route is now the headline. */
+
+.trip-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  /* overflow:hidden + the hero would clip the focus ring, so the ring is
+     drawn on the body instead. */
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--bg1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 10px 28px rgba(0, 0, 0, 0.14);
+  overflow: hidden;
+  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+}
+
+.trip-card:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1), 0 18px 40px rgba(0, 0, 0, 0.22);
+}
+
+/* --- Hero ------------------------------------------------------------- */
+
+.tc-hero {
+  position: relative;
+  height: 116px;
+  overflow: hidden;
+  background: var(--bg2);
+  /* The photo is inset a little and scaled up so translating it on hover
+     never exposes an unpainted edge. */
+  isolation: isolate;
+}
+
+.tc-hero img {
+  position: absolute;
+  inset: -4%;
+  width: 108%;
+  height: 108%;
+  object-fit: cover;
+  z-index: 0;
+  transform: scale(1.02);
+  transition: transform 0.5s ease;
+}
+
+.trip-card:hover .tc-hero img {
+  transform: scale(1.08);
+}
+
+/* Fallback scene, always painted underneath the photo. Built from the
+   card's --hue so an unknown city still looks like a deliberate choice
+   rather than a broken image. Uses no image asset, so it works offline. */
+.tc-scene {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(120% 80% at 50% 120%,
+      hsl(var(--hue) 70% 34% / 0.95) 0%,
+      transparent 60%),
+    radial-gradient(90% 70% at 22% 10%,
+      hsl(var(--hue) 85% 55% / 0.55) 0%,
+      transparent 55%),
+    linear-gradient(180deg, hsl(var(--hue) 45% 12%) 0%, hsl(var(--hue) 60% 8%) 100%);
+}
+
+/* Scrim: the hero needs to carry two badges and still read as a photo. */
+.tc-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.34) 0%, transparent 42%),
+    linear-gradient(0deg, rgba(0, 0, 0, 0.62) 0%, transparent 55%);
+}
+
+.tc-kind,
+.tc-saved {
+  position: absolute;
+  top: 9px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  backdrop-filter: blur(8px);
+}
+
+.tc-kind {
+  left: 9px;
+  color: var(--text);
+  background: rgba(10, 14, 22, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.tc-saved {
+  right: 9px;
+  color: #eaf7ee;
+  background: rgba(24, 92, 56, 0.72);
+  border: 1px solid rgba(120, 240, 170, 0.35);
+}
+
+/* --- Body ------------------------------------------------------------- */
+
+.tc-body {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 12px 13px 12px;
+}
+
+/* Route board. Grid, not flex: three flex children were wrapping into a
+   vertical stack, which collapsed the middle into a stray dash. */
+.tc-route {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 2px 0;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  border-radius: 8px;
+}
+
+.tc-route:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.tc-end {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.tc-end:last-of-type {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.tc-code {
+  font-size: 1.22rem;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tc-city {
+  font-size: 0.72rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+/* Plane between the two codes, with a dotted track behind it. */
+.tc-mid {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 2px;
+  color: var(--accent);
+}
+
+.tc-dash {
+  width: 12px;
+  height: 0;
+  border-top: 1.5px dashed color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.tc-plane {
+  transform: rotate(90deg);
+  flex: 0 0 auto;
+}
+
+/* --- Facts ------------------------------------------------------------ */
+
+.tc-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 6px;
+  padding-bottom: 2px;
+}
+
+.tc-fact {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg2);
+  color: var(--muted);
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.tc-fact svg {
+  flex: 0 0 auto;
+  opacity: 0.8;
+}
+
+/* --- Actions ---------------------------------------------------------- */
+
+.tc-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line);
+}
+
+.tc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 9px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line));
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--text);
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+.tc-btn:hover {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  border-color: var(--accent);
+}
+
+.tc-btn:active {
+  transform: translateY(1px);
+}
+
+.tc-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.tc-btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast, #fff);
+}
+
+.tc-btn.primary:hover {
+  filter: brightness(1.08);
+}
+
+/* Timestamp is secondary, so it is pushed right rather than given a box. */
+.tc-when {
+  margin-left: auto;
+  font-size: 0.68rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* Delete stays quiet until the card is hovered: it is a destructive action,
+   and three red buttons under three trip cards reads as an alarm. */
+.tc-del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--bg2);
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.18s ease, color 0.18s ease, background 0.18s ease,
+    border-color 0.18s ease, transform 0.18s ease;
+}
+
+.trip-card:hover .tc-del,
+.tc-del:focus-visible {
+  opacity: 1;
+}
+
+.tc-del:hover {
+  color: #ff6b6b;
+  background: color-mix(in srgb, #ff6b6b 14%, var(--bg2));
+  border-color: color-mix(in srgb, #ff6b6b 45%, var(--line));
+}
+
+.tc-del:active {
+  transform: translateY(1px);
+}
+
+.tc-del:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Touch devices never hover, so the button must not stay faded. */
+@media (hover: none) {
+  .tc-del {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 900px) {
+  .tc-hero {
+    height: 100px;
+  }
+
+  .tc-code {
+    font-size: 1.1rem;
+  }
+}
+
 .rc-srcs {
   display: flex;
   gap: 6px;
@@ -2094,6 +2432,24 @@
 
 @media (max-width: 600px) {
   .fl-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* The results layout is a fixed 300px filter rail plus the results. At 375px
+   that rail plus the gap left roughly zero for the results, and the app shell
+   clips overflow-x, so Flights, Hotels, Trips and Shopping showed filters and
+   no results at all. One column, filters first. */
+@media (max-width: 900px) {
+  .results-container {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+  .results-sidebar {
+    width: 100%;
+    max-width: 100%;
+  }
+  .recent-grid {
     grid-template-columns: 1fr;
   }
 }

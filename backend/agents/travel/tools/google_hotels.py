@@ -1,19 +1,12 @@
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any
 
-import serpapi
-from dotenv import load_dotenv
-
+from backend.agents.shared.serpapi_client import search as serpapi_search
 from backend.agents.travel.schemas.hotel import HotelSearchRequest, SortBy
 
-load_dotenv(override=True)
-
 logger = logging.getLogger(__name__)
-
-_client: serpapi.Client | None = None
 
 SORT_BY_MAP = {
     SortBy.RELEVANCE: None,
@@ -29,19 +22,7 @@ RATING_MAP = {
 }
 
 
-def _get_client() -> serpapi.Client:
-    global _client
-    if _client is None:
-        api_key = os.getenv("SERP_API_KEY")
-        if not api_key:
-            raise ValueError("SERP_API_KEY not found in environment")
-        _client = serpapi.Client(api_key=api_key)
-    return _client
-
-
 def google_hotels_search(request: HotelSearchRequest) -> dict[str, Any]:
-    client = _get_client()
-
     params: dict[str, Any] = {
         "engine": "google_hotels",
         "q": request.location,
@@ -76,7 +57,7 @@ def google_hotels_search(request: HotelSearchRequest) -> dict[str, Any]:
     )
 
     try:
-        results = client.search(params)
+        results = serpapi_search(params)
         data = results.data
         properties = data.get("properties", [])
         logger.info(f"SerpAPI response: {len(properties)} properties")

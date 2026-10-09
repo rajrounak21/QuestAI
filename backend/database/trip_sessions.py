@@ -3,14 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-# Trip runs take 1-3 minutes (6 LLM calls + ~7 SerpApi searches) with no
-# per-node progress writes yet, so the stale window must comfortably exceed
-# a healthy run. Reads auto-heal stuck docs instead of "running" forever.
 STALE_RUN_MINUTES = 10
 
-# Safety net on provider spend per trip. Hash-gating already skips unchanged
-# inputs; this caps runaway follow-up loops. Reached -> pause with a message,
-# user replies CONTINUE for +10.
 MAX_TRIP_SEARCHES = 20
 CONTINUE_BUMP = 10
 SEARCH_COSTS = {"flights": 1, "hotels": 1, "research": 5}
@@ -20,11 +14,20 @@ HISTORY_PROJECTION = {
     "session_id": 1,
     "title": 1,
     "query": 1,
+    "origin": 1,
     "destination": 1,
     "departure_date": 1,
     "return_date": 1,
     "status": 1,
     "updated_at": 1,
+    "trip.origin": 1,
+    "trip.destination": 1,
+    "trip.departure_date": 1,
+    "trip.return_date": 1,
+    "trip.duration_days": 1,
+    "trip.travelers": 1,
+    "trip.budget.max_total": 1,
+    "trip.budget.currency": 1,
 }
 
 # Terminal states — polling stops.
@@ -35,8 +38,20 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def make_title(query: str, destination: str = "") -> str:
-    base = (destination or "").strip() or (query or "").strip()
+def make_title(query: str, origin: str = "", destination: str = "") -> str:
+    """A trip's label.
+
+    The route, not just the destination: two saved trips to the same city are
+    indistinguishable otherwise ("Mumbai", "Mumbai"), which is exactly the
+    confusion in the Recent list. Falls back to the destination alone, then to
+    the raw query.
+    """
+    o = (origin or "").strip()
+    d = (destination or "").strip()
+    if o and d:
+        base = f"{o} to {d}"
+    else:
+        base = d or o or (query or "").strip()
     q = base[:70] if len(base) <= 70 else base[:67] + "..."
     return q or "Trip"
 
@@ -148,7 +163,12 @@ def complete_trip(
         if awaiting_kind is not None:
             update["awaiting_kind"] = awaiting_kind
     if trip and (trip.get("destination") or trip.get("trip_id")):
-        update["title"] = make_title("", trip.get("destination") or "")
+        update["title"] = make_title(
+            "", trip.get("origin", ""), trip.get("destination", "")
+        )
+        # origin was never mirrored to the top level, so history had no way to
+        # show the route without reading into the trip doc.
+        update["origin"] = trip.get("origin", "")
         update["destination"] = trip.get("destination", "")
         update["departure_date"] = trip.get("departure_date", "")
         update["return_date"] = trip.get("return_date")
@@ -169,21 +189,54 @@ def complete_trip(
         )
 
 
-def fail_trip(user_id: str, session_id: str, error: str) -> None:
+def fail_trip(
+    user_id: str,
+    session_id: str,
+    error: str,
+    *,
+    user_text: str = "",
+    assistant_text: str = "",
+) -> None:
+    """Terminal failure write.
+
+    `user_text` appends the turn that failed. Without it the user's message was
+    never persisted, so the thread kept rendering the PREVIOUS turn as "last"
+    and the optimistic "sending..." bubble could never be cleared - the client
+    waits for its own text to appear in the conversation.
+    """
     from backend.database.collections import get_trip_sessions_collection
 
     now = _utcnow()
-    get_trip_sessions_collection().update_one(
+    message = (error or "Trip planning failed")[:500]
+    col = get_trip_sessions_collection()
+    col.update_one(
         {"user_id": user_id, "session_id": session_id},
         {
             "$set": {
                 "status": "failed",
-                "error": (error or "Trip planning failed")[:500],
-                "progress": {"stage": "failed", "detail": error[:200], "at": now},
+                "error": message,
+                "progress": {"stage": "failed", "detail": message[:200], "at": now},
                 "updated_at": now,
+                # The retry affordance lives on the failed turn, so a failed
+                # run must not leave a stale pending preview behind.
+                "pending_preview": None,
+                "awaiting_kind": None,
             }
         },
     )
+    if user_text:
+        col.update_one(
+            {"user_id": user_id, "session_id": session_id},
+            {
+                "$push": {
+                    "conversation": {
+                        "user": user_text,
+                        "assistant": assistant_text or message,
+                        "at": now,
+                    }
+                }
+            },
+        )
 
 
 def is_stale(doc: dict[str, Any]) -> bool:
@@ -231,7 +284,28 @@ def list_history(user_id: str, limit: int = 20) -> list[dict[str, Any]]:
         .sort("updated_at", -1)
         .limit(max(1, min(limit, 50)))
     )
-    return list(cur)
+
+    items = list(cur)
+    for it in items:
+        trip = it.get("trip") or {}
+        origin = (it.get("origin") or trip.get("origin") or "").strip()
+        destination = (it.get("destination") or trip.get("destination") or "").strip()
+        it["origin"] = origin
+        it["destination"] = destination
+        it["duration_days"] = trip.get("duration_days")
+        it["travelers"] = trip.get("travelers")
+        it["budget"] = trip.get("budget") or {}
+        from backend.agents.travel.services.airports import resolve_iata
+
+        it["origin_iata"] = resolve_iata(origin) if origin else None
+        it["destination_iata"] = resolve_iata(destination) if destination else None
+        if not it.get("departure_date"):
+            it["departure_date"] = trip.get("departure_date") or ""
+        if not it.get("return_date"):
+            it["return_date"] = trip.get("return_date") or ""
+        if origin or destination:
+            it["title"] = make_title(it.get("query") or "", origin, destination)
+    return items
 
 
 def delete_trip_doc(user_id: str, session_id: str) -> bool:
@@ -250,6 +324,20 @@ _BANNED_CONTEXT_KEYS = {
     "flight_input_hash", "hotel_input_hash", "research_input_hash",
     "last_updated", "status", "trip_id", "conversation",
 }
+
+
+def _resolved_currency(trip: dict[str, Any]) -> str:
+    """The currency the searches actually used.
+
+    Delegates to the travel agent's resolver so the context handed to the LLM
+    can never disagree with the prices on screen.
+    """
+    from backend.agents.travel.agent.trip_graph import trip_currency
+
+    try:
+        return trip_currency(trip or {})
+    except Exception:
+        return str((trip or {}).get("budget", {}).get("currency") or "USD")
 
 
 def build_trip_context(
@@ -301,7 +389,9 @@ def build_trip_context(
         "duration_days": trip.get("duration_days"),
         "travelers": trip.get("travelers"),
         "budget": {
-            "currency": budget.get("currency", "USD"),
+            # Resolved once so the LLM sees the same currency the searches
+            # actually quoted, not the schema's "USD" default.
+            "currency": _resolved_currency(trip),
             "max_total": budget.get("max_total"),
             "flight_actual": budget.get("flight_actual"),
             "hotel_actual": budget.get("hotel_actual"),

@@ -1,38 +1,17 @@
-# Shapes verified against live responses - see verify_parsers.py.
-#  - google_news returns no snippet key; _news_snippet builds provenance instead,
-#    because process_sources() drops sources with an empty snippet.
-#  - google_scholar has no year key in publication_info; see _year_from_citation.
 from __future__ import annotations
 
 import logging
-import os
 import re
 from typing import Any
 
-import serpapi
-from dotenv import load_dotenv
-
 from backend.agents.research.schemas.sources import SearchResult, SourceType
-
-load_dotenv(override=True)
+from backend.agents.shared.serpapi_client import search as serpapi_search
 
 logger = logging.getLogger(__name__)
 
-_client: serpapi.Client | None = None
-
-# "..., 2020 - proceedings.neurips.cc" inside publication_info.summary.
+# "..., 2020 - proceedings.neurpsicc" inside publication_info.summary.
 _YEAR_IN_CITATION = re.compile(r",\s*((?:19|20)\d{2})\s*[-–]")
 _YEAR_ANYWHERE = re.compile(r"\b((?:19|20)\d{2})\b")
-
-
-def _get_client() -> serpapi.Client:
-    global _client
-    if _client is None:
-        api_key = os.getenv("SERP_API_KEY")
-        if not api_key:
-            raise ValueError("SERP_API_KEY not found in environment")
-        _client = serpapi.Client(api_key=api_key)
-    return _client
 
 
 def _parse_organic(results: list[dict[str, Any]], source_type: SourceType) -> list[SearchResult]:
@@ -55,12 +34,28 @@ def _parse_organic(results: list[dict[str, Any]], source_type: SourceType) -> li
 
 
 def google_search(query: str, num_results: int = 10) -> list[SearchResult]:
+    from backend.agents.research.tools.research_cache import (
+        get_cached,
+        restore,
+        serialise,
+        set_cached,
+    )
+
+    hit = get_cached("google", query, num_results)
+    if hit is not None:
+        items, _ = hit
+        logger.info(f"Research cache hit (google) for '{query[:60]}'")
+        return restore(items)
+
     try:
-        client = _get_client()
-        data = client.search({"engine": "google", "q": query, "num": num_results}).data
+        data = serpapi_search(
+            {"engine": "google", "q": query, "num": num_results},
+        ).data
         results = data.get("organic_results", [])
         logger.info(f"SerpAPI google: {len(results)} organic_results for '{query[:60]}'")
-        return _parse_organic(results, SourceType.GOOGLE)[:num_results]
+        parsed = _parse_organic(results, SourceType.GOOGLE)[:num_results]
+        set_cached("google", query, num_results, serialise(parsed))
+        return parsed
     except Exception as e:
         logger.error(f"SerpAPI google search failed: {e}")
         return []
@@ -77,9 +72,25 @@ def _year_from_citation(pub: dict[str, Any]) -> str:
 
 
 def google_scholar(query: str, num_results: int = 10) -> list[SearchResult]:
+    from backend.agents.research.tools.research_cache import get_cached, set_cached
+
+    from backend.agents.research.tools.research_cache import (
+        get_cached,
+        restore,
+        serialise,
+        set_cached,
+    )
+
+    hit = get_cached("google_scholar", query, num_results)
+    if hit is not None:
+        items, _ = hit
+        logger.info(f"Research cache hit (scholar) for '{query[:60]}'")
+        return restore(items)
+
     try:
-        client = _get_client()
-        data = client.search({"engine": "google_scholar", "q": query, "num": num_results}).data
+        data = serpapi_search(
+            {"engine": "google_scholar", "q": query, "num": num_results},
+        ).data
         results = data.get("organic_results", [])
         logger.info(f"SerpAPI scholar: {len(results)} organic_results for '{query[:60]}'")
         out: list[SearchResult] = []
@@ -93,7 +104,9 @@ def google_scholar(query: str, num_results: int = 10) -> list[SearchResult]:
                 date=_year_from_citation(pub) or r.get("date", ""),
                 raw_data=r,
             ))
-        return [s for s in out if s.title.strip() and s.url][:num_results]
+        final = [s for s in out if s.title.strip() and s.url][:num_results]
+        set_cached("google_scholar", query, num_results, serialise(final))
+        return final
     except Exception as e:
         logger.error(f"SerpAPI scholar search failed: {e}")
         return []
@@ -114,9 +127,25 @@ def _news_snippet(r: dict[str, Any]) -> str:
 
 
 def google_news(query: str, num_results: int = 10) -> list[SearchResult]:
+    from backend.agents.research.tools.research_cache import get_cached, set_cached
+
+    from backend.agents.research.tools.research_cache import (
+        get_cached,
+        restore,
+        serialise,
+        set_cached,
+    )
+
+    hit = get_cached("google_news", query, num_results)
+    if hit is not None:
+        items, _ = hit
+        logger.info(f"Research cache hit (news) for '{query[:60]}'")
+        return restore(items)
+
     try:
-        client = _get_client()
-        data = client.search({"engine": "google_news", "q": query, "num": num_results}).data
+        data = serpapi_search(
+            {"engine": "google_news", "q": query, "num": num_results},
+        ).data
         results = data.get("news_results", []) or data.get("organic_results", [])
         logger.info(f"SerpAPI news: {len(results)} results for '{query[:60]}'")
         out: list[SearchResult] = []
@@ -129,7 +158,9 @@ def google_news(query: str, num_results: int = 10) -> list[SearchResult]:
                 date=r.get("iso_date", "") or r.get("date", ""),
                 raw_data=r,
             ))
-        return [s for s in out if s.title.strip() and s.url][:num_results]
+        final = [s for s in out if s.title.strip() and s.url][:num_results]
+        set_cached("google_news", query, num_results, serialise(final))
+        return final
     except Exception as e:
         logger.error(f"SerpAPI news search failed: {e}")
         return []

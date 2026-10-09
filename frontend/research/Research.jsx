@@ -229,9 +229,6 @@ function PanelSvg() {
   );
 }
 
-// Dashboard grid, matching the icon the other agent pages use for /home.
-// The old roof-shaped HomeSvg read as "back to landing" rather than "back to
-// the QuestAI dashboard".
 function DashboardSvg() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -273,6 +270,7 @@ export default function Research() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [sessions, setSessions] = useState([]);
+  const [historyError, setHistoryError] = useState("");
   const [doc, setDoc] = useState(null);
   const [loading, setLoading] = useState(true);
   const [input, setInput] = useState("");
@@ -305,8 +303,12 @@ export default function Research() {
     try {
       const data = await researchApi.history(30);
       setSessions(data.items || []);
-    } catch {
-      /* sidebar stays empty, page still works */
+      setHistoryError("");
+    } catch (e) {
+      // Empty and failed look identical downstream, which made the sidebar
+      // claim "no runs yet" for a request that never succeeded.
+      if (e.code === "unauthorized") return;
+      setHistoryError(e.message || "Could not load your saved runs.");
     }
   };
 
@@ -485,11 +487,6 @@ export default function Research() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
-  // ?q= from the dashboard hands the question over. When the router had every
-  // field it needed, autoRun starts the run itself — the query is the only
-  // required field, so there is nothing to ask. Otherwise it only pre-fills, the
-  // same path the empty-state tip cards use. The param is stripped either way so
-  // a refresh can't re-fire over the user's edits.
   useEffect(() => {
     const q = searchParams.get("q");
     if (!q || autoRunRef.current || sessionId) return;
@@ -908,7 +905,14 @@ export default function Research() {
           </span>
         </div>
         <div className="rs-sess-list">
-          {sessions.length === 0 && <p className="rs-sess-empty">No sessions yet.</p>}
+          {historyError ? (
+            <p className="rs-sess-empty">
+              {historyError}{" "}
+              <button className="auth-link" onClick={loadSessions}>Retry</button>
+            </p>
+          ) : sessions.length === 0 ? (
+            <p className="rs-sess-empty">No sessions yet.</p>
+          ) : null}
           {sessions.map((s) => (
             <div key={s.session_id} className={`rs-sess${s.session_id === sessionId ? " active" : ""}`}>
               <button

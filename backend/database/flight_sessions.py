@@ -55,10 +55,6 @@ def upsert_session_on_search(
                 "flight_count": flight_count,
                 "last_search_at": now,
                 "updated_at": now,
-                # Follows the most recent search, not the first. See the note in
-                # hotel_sessions.py - in $setOnInsert this only ever ran once,
-                # so a session kept the opening search's title while
-                # origin/destination kept moving and the results below changed.
                 "title": make_title(query),
                 "query": query,
                 **summary,
@@ -82,13 +78,14 @@ def insert_search(
 ) -> dict[str, Any]:
     from backend.database.collections import get_flight_searches_collection
 
+    stored = (flights or [])[:MAX_PERSIST_FLIGHTS]
     doc: dict[str, Any] = {
         "user_id": user_id,
         "session_id": session_id,
         "query": query,
         "params": params or {},
-        "flights": (flights or [])[:MAX_PERSIST_FLIGHTS],
-        "flight_count": len(flights or []),
+        "flights": stored,
+        "flight_count": len(stored),
         "created_at": _utcnow(),
     }
     get_flight_searches_collection().insert_one(doc)
@@ -131,26 +128,54 @@ def get_session_with_latest_search(
 def list_session_searches(user_id: str, session_id: str, limit: int = 20) -> list[dict[str, Any]]:
     """Every search run inside one session, newest first.
 
-    Each search is its own row, so this is the only place the earlier ones were
-    ever reachable - previously a session showed latest-only and the rest sat in
-    Mongo unseen. Flights are left out on purpose: this backs a compact list,
-    and the page loads results through get_session_with_latest_search().
+    Each search is its own row. Flights are left out here - this backs a compact
+    list, and a chosen search is loaded on its own via get_session_search() so
+    opening one never pulls every search's results at once.
     """
     from backend.database.collections import get_flight_searches_collection
 
-    cur = (
-        get_flight_searches_collection()
-        .find(
-            {"user_id": user_id, "session_id": session_id},
-            {"query": 1, "flight_count": 1, "created_at": 1, "_id": 0},
-        )
-        .sort("created_at", -1)
-        .limit(max(1, min(limit, 50)))
-    )
-    items = list(cur)
-    for it in items:
-        it["created_at"] = it["created_at"].isoformat() if it.get("created_at") else ""
+    cur = get_flight_searches_collection().aggregate([
+        {"$match": {"user_id": user_id, "session_id": session_id}},
+        {"$sort": {"created_at": -1}},
+        {"$limit": max(1, min(limit, 50))},
+        {"$project": {
+            "_id": 1,
+            "query": 1,
+            "created_at": 1,
+            "flight_count": {"$size": {"$ifNull": ["$flights", []]}},
+        }},
+    ])
+    items = []
+    for doc in cur:
+        items.append({
+            "search_id": str(doc["_id"]),
+            "query": doc.get("query", ""),
+            "flight_count": doc.get("flight_count", 0),
+            "created_at": doc["created_at"].isoformat() if doc.get("created_at") else "",
+        })
     return items
+
+
+def get_session_search(
+    user_id: str, session_id: str, search_id: str
+) -> dict[str, Any] | None:
+    """One search from a session, with its flights.
+
+    Scoped by session_id as well as _id so a search id from another session
+    cannot be read by guessing it.
+    """
+    from bson import ObjectId
+    from bson.errors import InvalidId
+
+    from backend.database.collections import get_flight_searches_collection
+
+    try:
+        oid = ObjectId(search_id)
+    except (InvalidId, TypeError):
+        return None
+    return get_flight_searches_collection().find_one(
+        {"_id": oid, "user_id": user_id, "session_id": session_id}
+    )
 
 
 def delete_session(user_id: str, session_id: str) -> bool:

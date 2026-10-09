@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { History, Trash2, LayoutGrid, Plus, Plane, Building2 } from "lucide-react";
+import { History, Trash2, LayoutGrid, Plus, Plane, Building2, CalendarDays, Users, Wallet } from "lucide-react";
 import TripSearch from "./components/TripSearch";
 import TripThread from "./components/TripThread";
 import Collapsible from "./components/Collapsible";
@@ -26,6 +26,85 @@ import "../shared/travel.css";
 const POLL_MS = 2500;
 const POLL_MAX_TRIES = 200; // ~8 min ceiling, trips run 1-3 min
 const TERMINAL = ["ready", "awaiting_input", "failed"];
+
+const TRIP_PHOTOS = {
+  delhi: "photo-1517248135467-4c7edcad34c4",
+  mumbai: "photo-1522117261622-91f03e4dd7d7",
+  dubai: "photo-1512453979798-5ea266f8880c",
+  bali: "photo-1537996194471-e657df975ab4",
+  singapore: "photo-1525625293386-3f8f99389edd",
+  "new delhi": "photo-1517248135467-4c7edcad34c4",
+  goa: "photo-1512343879784-a960bf40e7f2",
+  bangkok: "photo-1508009603885-50cf7c579365",
+  "new york": "photo-1485871981521-5b1fd3805eee",
+  paris: "photo-1502602898657-3e91760cbb34",
+  tokyo: "photo-1540959733332-eab4deabeeaf",
+  london: "photo-1513635269975-59663e0ac1ad",
+  rome: "photo-1552832230-c0197dd311b5",
+  barcelona: "photo-1583422409516-2895a77efded",
+  "cape town": "photo-1580060839134-75a5edca2e99",
+  maldives: "photo-1514282401047-d79a71a590e8",
+  "sri lanka": "photo-1580657018950-c7f7d6a6d990",
+  switzerland: "photo-1527668752968-14dc70a27c95",
+  iceland: "photo-1504829857797-ddff29c27927",
+  norway: "photo-1520769669658-f07657f5a307",
+  japan: "photo-1493976040374-85c8e12f0c0e",
+  thailand: "photo-1528181304800-259b08848526",
+  greece: "photo-1507525428034-b723cf961d3e",
+  dubai: "photo-1512453979798-5ea266f8880c",
+};
+
+function tripPhoto(destination) {
+  const key = String(destination || "").toLowerCase().trim();
+  const id = TRIP_PHOTOS[key] || Object.keys(TRIP_PHOTOS).find((k) => key.includes(k));
+  // ?auto=format&w=900&q=70 -> CDN-sized, so the card is not shipping a 4000px
+  // original for a 280px thumbnail.
+  return id
+    ? `https://images.unsplash.com/${id}?auto=format&fit=crop&w=900&q=70`
+    : null;
+}
+
+// Stable per-name hue, so an unknown city still gets a distinct scene
+// instead of every card falling back to the same flat grey.
+function tripHue(seed) {
+  let h = 0;
+  for (let i = 0; i < String(seed || "").length; i += 1) {
+    h = (h * 31 + String(seed).charCodeAt(i)) % 360;
+  }
+  return h;
+}
+
+function formatTripDate(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ""));
+  if (!m) return String(iso || "");
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const idx = Number(m[2]) - 1;
+  return `${Number(m[3])} ${months[idx] || m[2]} ${m[1]}`;
+}
+
+function formatBudget(budget) {
+  const cur = budget?.currency || "";
+  // No symbol table: an ISO code is unambiguous, a wrong symbol is a lie.
+  return `${budget.max_total}${cur ? ` ${cur}` : ""}`;
+}
+
+function tripFormValues(trip) {
+  const budget = trip.budget || {};
+  return {
+    origin: trip.origin || "",
+    destination: trip.destination || "",
+    departure_date: trip.departure_date || "",
+    duration_days: trip.duration_days || 5,
+    // Never fall back to a truthiness default here: 0 is meaningless, but any
+    // real count must win over the form's own default.
+    travelers: trip.travelers || 1,
+    budget: {
+      max_total: budget.max_total != null ? budget.max_total : null,
+      currency: budget.currency || "",
+    },
+  };
+}
 
 export default function Trips() {
   const navigate = useNavigate();
@@ -146,6 +225,8 @@ export default function Trips() {
     setNotice("");
     setSelectedFlight(null);
     setSelectedHotel(null);
+    // Immediate feedback on tap, as with sendChat.
+    setRunning(true);
     try {
       const res = await tripsApi.plan({ query: q, session_id: sessionId || undefined });
       if (res.session_id && res.session_id !== sessionId) {
@@ -153,6 +234,7 @@ export default function Trips() {
       }
       pollUntilDone(res.session_id);
     } catch (err) {
+      setRunning(false);
       if (err.code === "unauthorized") {
         navigate("/login", { replace: true });
         return;
@@ -170,10 +252,12 @@ export default function Trips() {
     const msg = (message || "").trim();
     if (!msg || running || !sessionId) return;
     setNotice("");
+    setRunning(true);
     try {
       await tripsApi.chat(sessionId, msg);
       pollUntilDone(sessionId);
     } catch (err) {
+      setRunning(false);
       if (err.code === "unauthorized") {
         navigate("/login", { replace: true });
         return;
@@ -186,14 +270,13 @@ export default function Trips() {
     }
   };
 
-  // Form-modal submit (confirm_details gate): create forks a linked new
-  // session, overwrite replans in place with modal approval. No silent moves.
   const handleDetailsSubmit = async (query, actionId) => {
     const q = (query || "").trim();
     if (!q || running) return;
     setNotice("");
     setSelectedFlight(null);
     setSelectedHotel(null);
+    setRunning(true);
     try {
       if (actionId === "overwrite" && sessionId) {
         await tripsApi.plan({
@@ -208,6 +291,7 @@ export default function Trips() {
         pollUntilDone(res.session_id);
       }
     } catch (err) {
+      setRunning(false);
       if (err.code === "unauthorized") {
         navigate("/login", { replace: true });
         return;
@@ -220,8 +304,6 @@ export default function Trips() {
     }
   };
 
-  // Open saved trip (Mongo only, zero provider cost); attach if still running.
-  // loadingSession gives instant feedback so the page never looks dead blank.
   const loadSessionDoc = () => {
     if (!sessionId) return;
     setLoadingSession(true);
@@ -234,6 +316,7 @@ export default function Trips() {
         setDoc(d);
         setLastSearched(d.updated_at || "");
         setLoadingSession(false);
+        if (d.trip?.destination) setPrefillValues(tripFormValues(d.trip));
         if (!TERMINAL.includes(d.status)) pollUntilDone(sessionId);
         loadHistory();
       })
@@ -259,17 +342,11 @@ export default function Trips() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
-  // ?q= from the dashboard only PREFILLS the form. It used to call startPlan(q)
-  // here, which kicked off a full trip plan — the most expensive run in the app —
-  // the moment the page opened. Nothing runs until the user presses Search.
   useEffect(() => {
     const q = searchParams.get("q");
     if (!q || autoRunRef.current || sessionId) return;
     autoRunRef.current = true;
     setSearchParams({}, { replace: true });
-    // Merged per field so a value the router dropped still comes from the parser.
-    // Router wins where it has one. TripSearch reads budget as
-    // { budget: { max_total } } while the router returns it flat, so reshape.
     const f = mergeFields(routerPrefill?.fields, parseTripQuery(q));
     if (f.budget_max != null) {
       f.budget = { ...(f.budget || {}), max_total: Number(f.budget_max) };
@@ -381,7 +458,7 @@ export default function Trips() {
           </Collapsible>
         )}
 
-        <TripItinerary days={trip.itinerary} currency={(trip.budget || {}).currency} />
+        <TripItinerary days={trip.itinerary} currency={(trip.budget || {}).currency || "USD"} />
       </>
     );
   };
@@ -454,8 +531,11 @@ export default function Trips() {
             stale={stale}
             elapsedText={fmtElapsed(elapsed)}
             onSend={sendChat}
-            onAnswerClarifying={sendChat}
-            onRetry={() => startPlan(doc?.query || "")}
+  onRetry={(message) => {
+    const q = (message || "").trim();
+    if (sessionId && q) sendChat(q);
+    else startPlan(q || doc?.query || "");
+  }}
             onSubmitDetails={handleDetailsSubmit}
             renderTripDetail={renderTripDetail}
           />
@@ -478,25 +558,104 @@ export default function Trips() {
                 <div className="recent-empty">No trips yet — your plans will appear here.</div>
               ) : (
                 <div className="recent-grid">
-                  {sessions.map((s) => (
-                    <div key={s.session_id} className="recent-card">
-                      <button className="open" onClick={() => navigate(`/trips/${s.session_id}`)}>
-                        <strong>{s.title}</strong>
-                        <span className="rc-srcs">
-                          <span className="rc-src google">{s.status || ""}</span>
+                  {sessions.map((s) => {
+                    const from = s.origin || "";
+                    const to = s.destination || "";
+                    const photo = tripPhoto(to) || tripPhoto(from);
+                    const hue = tripHue(to || s.session_id);
+                    return (
+                    <article
+                      key={s.session_id}
+                      className="trip-card"
+                      style={{ "--hue": hue }}
+                    >
+                      {/* Hero. The photo is decorative, so a failed load must not
+                          leave a torn icon - the gradient scene is the fallback. */}
+                      <div className="tc-hero">
+                        {photo && (
+                          <img
+                            src={photo}
+                            alt=""
+                            loading="lazy"
+                            onError={(e) => { e.currentTarget.style.display = "none"; }}
+                          />
+                        )}
+                        <span className="tc-scene" aria-hidden="true" />
+                        <span className="tc-veil" aria-hidden="true" />
+                        <span className="tc-kind">
+                          <Plane size={11} aria-hidden="true" />
+                          Trip
                         </span>
-                      </button>
-                      <div className="rc-foot">
-                        <span>
-                          <span className="rc-count">{s.destination || ""}</span>
-                          <span className="rc-time">· {timeAgo(s.updated_at)}</span>
-                        </span>
-                        <button className="rc-del" title="Delete" aria-label="Delete trip" onClick={() => setConfirmDelete(s)}>
-                          <Trash2 size={14} />
-                        </button>
+                        {s.status === "ready" && <span className="tc-saved">Saved</span>}
                       </div>
-                    </div>
-                  ))}
+
+                      {/* Route as a two-column board: codes read at a glance, city
+                          names underneath. A bare city name told the user nothing
+                          when two saved trips ended in the same place. */}
+                      <div className="tc-body">
+                        <button
+                          className="tc-route"
+                          onClick={() => navigate(`/trips/${s.session_id}`)}
+                          title={s.query || s.title}
+                        >
+                          <span className="tc-end">
+                            <span className="tc-code">{s.origin_iata || "•••"}</span>
+                            <span className="tc-city">{from || "—"}</span>
+                          </span>
+                          <span className="tc-mid" aria-hidden="true">
+                            <span className="tc-dash" />
+                            <Plane size={15} className="tc-plane" />
+                            <span className="tc-dash" />
+                          </span>
+                          <span className="tc-end">
+                            <span className="tc-code">{s.destination_iata || "•••"}</span>
+                            <span className="tc-city">{to || s.title}</span>
+                          </span>
+                        </button>
+
+                        <div className="tc-facts">
+                          {s.departure_date && (
+                            <span className="tc-fact">
+                              <CalendarDays size={12} aria-hidden="true" />
+                              {formatTripDate(s.departure_date)}
+                              {s.duration_days ? ` · ${s.duration_days}d` : ""}
+                            </span>
+                          )}
+                          {s.travelers ? (
+                            <span className="tc-fact">
+                              <Users size={12} aria-hidden="true" />
+                              {s.travelers} {s.travelers === 1 ? "guest" : "guests"}
+                            </span>
+                          ) : null}
+                          {s.budget?.max_total != null && (
+                            <span className="tc-fact">
+                              <Wallet size={12} aria-hidden="true" />
+                              {formatBudget(s.budget)}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="tc-actions">
+                          <button
+                            className="tc-btn primary"
+                            onClick={() => navigate(`/trips/${s.session_id}`)}
+                          >
+                            View Details
+                          </button>
+                          <span className="tc-when">{timeAgo(s.updated_at)}</span>
+                          <button
+                            className="tc-del"
+                            title="Delete trip"
+                            aria-label={`Delete trip ${s.title}`}
+                            onClick={() => setConfirmDelete(s)}
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                    );
+                  })}
                 </div>
               )}
             </div>

@@ -69,9 +69,6 @@ const NAV_PATH = {
 // Agent list lives in src/shared/agents.js so the dropdown, submit() routing
 // and the suggestion cards all read from one place.
 
-// Recent-activity cards open their saved session. A lookup beats a nested
-// ternary here: Jobs was silently missing from the old chain, so job cards
-// opened /research/<id> instead of /jobs/<id>.
 const ACTIVITY_PATH = {
   Research: "/research",
   Shopping: "/shopping",
@@ -85,8 +82,8 @@ const SUGGESTIONS = [
   { agent: "research", text: "Compare RAG evaluation frameworks" },
   { agent: "flights", text: "Find flights from Delhi to Dubai" },
   { agent: "hotels", text: "Find hotels in Bali for 5 nights" },
-  { agent: "shopping", text: "Compare phones under ₹30,000" },
-  { agent: "jobs", text: "Find AI internships in India" },
+  { agent: "shopping", text: "Compare phones under 30000" },
+  { agent: "jobs", text: "Find remote product analyst jobs for freshers" },
 ];
 
 function timeAgo(iso) {
@@ -117,8 +114,6 @@ const AGENT_ROWS = [
   { name: "Trips", desc: "Full itinerary: flights, hotels, plans", path: "/trips" },
 ];
 
-// Rotating hero lines: 4 time slots x 6 messages. Picked deterministically
-// by day-of-year — stable all day, fresh every morning. No backend needed.
 const GREETINGS = {
   morning: [
     { greet: "Good morning", sub: "What are we hunting today — flights, hotels or deep research?" },
@@ -188,16 +183,11 @@ export default function Home() {
   const [reply, setReply] = useState(null); // { q, text }
 const [routeError, setRouteError] = useState(null);
 const [activity, setActivity] = useState([]);
-  // Set when the router picked an agent but a required field was missing. The
-  // asker renders in the chat area instead of navigating, so the user never
-  // reaches a form they would only have to come back from.
+const [activityVerified, setActivityVerified] = useState(false);
   const [pendingRoute, setPendingRoute] = useState(null);
   const [mailEnabled, setMailEnabled] = useState(false);
   const [verifyDismissed, setVerifyDismissed] = useState(readVerifySkipped);
   const [verifyOpen, setVerifyOpen] = useState(false);
-  // One ask per distinct question. Without this, re-submitting the same
-  // sentence would loop: route -> ask -> answer -> route -> ask.
-  const askedRef = useRef(new Set());
 
   useEffect(() => {
     if (!getToken()) {
@@ -232,12 +222,12 @@ const [activity, setActivity] = useState([]);
         // Jobs is in this list too — omitting it was why job searches never
         // appeared in Recent activity.
         Promise.all([
-          authFetch("/api/research/history?limit=5").then((h) => h && !h.unauthorized && !h.networkError ? h.json().catch(() => ({})) : {}),
-          authFetch("/api/shopping/history?limit=5").then((h) => h && !h.unauthorized && !h.networkError ? h.json().catch(() => ({})) : {}),
-          authFetch("/api/flights/history?limit=5").then((h) => h && !h.unauthorized && !h.networkError ? h.json().catch(() => ({})) : {}),
-          authFetch("/api/hotels/history?limit=5").then((h) => h && !h.unauthorized && !h.networkError ? h.json().catch(() => ({})) : {}),
-          authFetch("/api/trips/history?limit=5").then((h) => h && !h.unauthorized && !h.networkError ? h.json().catch(() => ({})) : {}),
-          authFetch("/api/jobs/history?limit=5").then((h) => h && !h.unauthorized && !h.networkError ? h.json().catch(() => ({})) : {}),
+          authFetch("/api/research/history?limit=5").then((h) => h && !h.unauthorized && !h.networkError ? h.json().then((d) => ({ ...d, __ok: true })).catch(() => ({})) : {}),
+          authFetch("/api/shopping/history?limit=5").then((h) => h && !h.unauthorized && !h.networkError ? h.json().then((d) => ({ ...d, __ok: true })).catch(() => ({})) : {}),
+          authFetch("/api/flights/history?limit=5").then((h) => h && !h.unauthorized && !h.networkError ? h.json().then((d) => ({ ...d, __ok: true })).catch(() => ({})) : {}),
+          authFetch("/api/hotels/history?limit=5").then((h) => h && !h.unauthorized && !h.networkError ? h.json().then((d) => ({ ...d, __ok: true })).catch(() => ({})) : {}),
+          authFetch("/api/trips/history?limit=5").then((h) => h && !h.unauthorized && !h.networkError ? h.json().then((d) => ({ ...d, __ok: true })).catch(() => ({})) : {}),
+          authFetch("/api/jobs/history?limit=5").then((h) => h && !h.unauthorized && !h.networkError ? h.json().then((d) => ({ ...d, __ok: true })).catch(() => ({})) : {}),
         ])
           .then(([rd, sd, fd, hd, td, jd]) => {
             const rItems = (rd.items || []).map((a) => ({ ...a, agent: "Research" }));
@@ -285,6 +275,10 @@ const [activity, setActivity] = useState([]);
             const all = [...rItems, ...sItems, ...fItems, ...hItems, ...tItems, ...jItems];
             all.sort((a, b) => timeOf(b) - timeOf(a));
             setActivity(all.slice(0, 6));
+            const answered = [rd, sd, fd, hd, td, jd].filter((d) => d && d.__ok);
+            if (answered.length > 0 && answered.every((d) => (d.items || []).length === 0)) {
+              setActivityVerified(true);
+            }
           })
           .catch(() => {});
       })
@@ -310,8 +304,6 @@ const [activity, setActivity] = useState([]);
     setVerifyDismissed(true);
   };
 
-  // Escape hatch for "Skip for now": the banner is gone but verification is
-  // still possible from the profile menu, so the skip is never a dead end.
   const startVerify = () => {
     clearVerifySkipped();
     setVerifyDismissed(false);
@@ -328,25 +320,14 @@ const [activity, setActivity] = useState([]);
     user && !user.email_verified && mailEnabled && !verifyDismissed && !verifyOpen
   );
 
-  const submit = (e) => {
-    e.preventDefault();
-    const q = query.trim();
+  const runQuery = (q, agentId) => {
     if (!q || thinking) return;
-    // A chosen agent just goes to its own workspace. No keyword sniffing here:
-    // Flights / Hotels / Trips used to be lumped into one "Travel" pill that
-    // guessed between them, so picking Travel for a hotel search could land on
-    // a full itinerary plan instead.
-    const chosen = AGENT_BY_ID[agent];
+    const chosen = agentId ? AGENT_BY_ID[agentId] : null;
     if (chosen?.path) {
       navigate(`${chosen.path}?q=${encodeURIComponent(q)}`);
       return;
     }
 
-    // ---- Auto: the universal layer decides -------------------------------
-    // The LLM picks ONE specialist and pre-extracts its form fields. It does
-    // not run anything: we navigate, the destination pre-fills its form, and
-    // the user presses Search themselves. A greeting gets an inline reply
-    // instead, because the Assistant has no page.
     setThinking(true);
     setRouteError(null);
     setReply(null);
@@ -376,22 +357,12 @@ const [activity, setActivity] = useState([]);
               : "The router did not choose an agent. Please try rephrasing."
           );
         }
-        // Ask before navigating when a required field is missing, so the user
-        // answers in their own words instead of landing on a half-filled form.
-        // The router told us exactly what it could not get.
         const missing = d.receipt?.missing || [];
-        if (missing.length > 0 && !askedRef.current.has(q)) {
-          askedRef.current.add(q);
+        if (missing.length > 0) {
           setPendingRoute({ route: d, q, agent: d.agent });
           return;
         }
 
-        // `state` (not the URL) carries the pre-extracted fields. It dies with
-        // the navigation, so a refresh falls back to the page's own parser
-        // instead of re-applying stale values.
-        //
-        // autoRun fires only when nothing was missing. That is the whole
-        // difference between an agent and a redirect.
         navigate(`${d.path}?q=${encodeURIComponent(q)}`, {
           state: {
             prefill: {
@@ -414,6 +385,12 @@ const [activity, setActivity] = useState([]);
         );
       })
       .finally(() => setThinking(false));
+  };
+
+  // Reads state at call time and hands off to runQuery.
+  const submit = (e) => {
+    e.preventDefault();
+    runQuery(query.trim(), agent);
   };
 
   /**
@@ -507,13 +484,9 @@ const [activity, setActivity] = useState([]);
                 className={`dash-navlink${active === n ? " active" : ""}`}
                 onClick={() => {
                   setMenu(false);
-                  // Same lookup as submit(): one source of truth for paths.
-                  const target = NAV_PATH[n];
-                  if (target) {
-                    navigate(target);
-                    return;
-                  }
                   setActive(n);
+                  const target = NAV_PATH[n];
+                  if (target) navigate(target);
                 }}
               >
                 {n}
@@ -523,7 +496,20 @@ const [activity, setActivity] = useState([]);
         </div>
         <div className="dash-right">
           <ThemeToggle />
-          <button className="dash-iconbtn" title="Notifications" onClick={() => setMenu(false)}><BellIcon /></button>
+          {/* A bell that closed the mobile menu read as a broken notification
+              centre. There is no notification stream in the product, so it
+              points at the one place that does surface alerts. */}
+          <button
+            className="dash-iconbtn"
+            title="Job alerts"
+            aria-label="Job alerts"
+            onClick={() => {
+              setMenu(false);
+              navigate("/jobs");
+            }}
+          >
+            <BellIcon />
+          </button>
           <div className="dash-profile">
             <button className="dash-userbtn" onClick={() => setProfile((p) => !p)}>
               {firstName} ▾
@@ -534,9 +520,19 @@ const [activity, setActivity] = useState([]);
                   <strong>{user.name || firstName}</strong>
                   <span>{maskEmail(user.email)}</span>
                 </div>
-                {["Profile", "Settings", "Alerts"].map((x) => (
-                  <button key={x} className="dash-menuitem" onClick={() => setProfile(false)}>{x}</button>
-                ))}
+                {/* These used to just close the menu. Only "Alerts" has a real
+                  destination (/jobs owns the alert panel); there is no profile
+                  page, so that entry is not rendered rather than shipped as a
+                  button that goes nowhere. */}
+                <button
+                  className="dash-menuitem"
+                  onClick={() => {
+                    setProfile(false);
+                    navigate("/jobs");
+                  }}
+                >
+                  Alerts
+                </button>
                 {mailEnabled && !user.email_verified && (
                   <button className="dash-menuitem" onClick={startVerify}>
                     Verify email
@@ -660,12 +656,8 @@ const [activity, setActivity] = useState([]);
                   type="button"
                   className="dash-suggest-card"
                   onClick={() => {
-                    // Prefill only. This must never run the agent — the user
-                    // still has to press Send. type="button" keeps it that way
-                    // even if this markup ever ends up inside a <form>.
                     setQuery(s.text);
-                    setAgent(s.agent);
-                    if (inputRef.current) inputRef.current.focus();
+                    runQuery(s.text, null);
                   }}
                 >
                   {/* s.agent is an id now ("flights"), so show the label. */}
@@ -682,13 +674,23 @@ const [activity, setActivity] = useState([]);
         <section>
           <p className="dash-sect-label">Recent activity</p>
           <div className="dash-activity">
-            {activity.length === 0 && (
+            {activity.length === 0 && activityVerified && (
               <div className="dash-act-card">
                 <strong>Research</strong>
                 <span className="dash-act-title">Your workspace is ready — start by asking something.</span>
                 <div className="dash-act-foot">
                   <span>no history yet</span>
                   <button className="auth-link" onClick={() => navigate("/research")}>Ask something →</button>
+                </div>
+              </div>
+            )}
+            {activity.length === 0 && !activityVerified && (
+              <div className="dash-act-card">
+                <strong>Recent activity</strong>
+                <span className="dash-act-title">Could not load your recent activity.</span>
+                <div className="dash-act-foot">
+                  <span>try again</span>
+                  <button className="auth-link" onClick={() => window.location.reload()}>Reload →</button>
                 </div>
               </div>
             )}

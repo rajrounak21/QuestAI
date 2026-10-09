@@ -31,6 +31,7 @@ export default function Hotels() {
   const [filters, setFilters] = useState({ ...DEFAULT_FILTERS });
 
   const [sessions, setSessions] = useState([]);
+  const [historyError, setHistoryError] = useState("");
   const [sessionTitle, setSessionTitle] = useState("");
   const [lastSearched, setLastSearched] = useState("");
 
@@ -57,7 +58,13 @@ export default function Hotels() {
     try {
       const data = await hotelsApi.history(20);
       setSessions(data.items || []);
-    } catch { /* history stays empty */ }
+      setHistoryError("");
+    } catch (e) {
+      // Empty and failed look identical downstream, which made the page claim
+      // "no hotel history yet" for a request that never succeeded.
+      if (e.code === "unauthorized") return;
+      setHistoryError(e.message || "Could not load your saved searches.");
+    }
   };
 
   useEffect(() => {
@@ -126,8 +133,6 @@ export default function Hotels() {
       .then((d) => {
         if (!alive) return;
         const latest = d.latest;
-        // See Flights.jsx - session.title is frozen at the first search, so use the
-        // latest search row's query instead or the heading contradicts the list.
         setSessionTitle(latest?.query || d.session?.title || d.session?.query || "");
         setLastSearched(d.session?.last_search_at || latest?.created_at || "");
         setHotels(latest?.hotels || []);
@@ -145,9 +150,6 @@ export default function Hotels() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
-  // ?q= from the dashboard only PREFILLS the form. It used to call
-  // handleSearch(q) here, which ran a live search the moment the page opened.
-  // The param is still stripped so a refresh can't re-fill over the user's edits.
   useEffect(() => {
     const q = searchParams.get("q");
     if (!q || autoRunRef.current || sessionId) return;
@@ -311,9 +313,14 @@ export default function Hotels() {
                 {sessions.length > 0 && <span className="recent-count">{sessions.length}</span>}
                 {sessions.length > 0 && <span className="recent-hint">Opens saved results · no new search spent</span>}
               </div>
-              {sessions.length === 0 ? (
-                <div className="recent-empty">No hotel history yet — your searches will appear here.</div>
-              ) : (
+{historyError ? (
+                  <div className="recent-empty">
+                    {historyError}{" "}
+                    <button className="btn-ghost" onClick={loadHistory}>Retry</button>
+                  </div>
+                ) : sessions.length === 0 ? (
+                  <div className="recent-empty">No hotel history yet — your searches will appear here.</div>
+                ) : (
                 <div className="recent-grid">
                   {sessions.map((s) => (
                     <div key={s.session_id} className="recent-card">

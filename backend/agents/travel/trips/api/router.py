@@ -84,9 +84,6 @@ def _run_and_persist(
             if doc.get("status") == "awaiting_input"
             else []
         )
-        # Context assembly: the LLM always sees the curated trip (params,
-        # budget actuals, picks, day-titles+costs, last 2 turns) plus the
-        # message. Fresh plans have no trip — raw query, zero change.
         effective_query = raw_query
         if pending:
             convo = doc.get("conversation") or []
@@ -166,12 +163,40 @@ def _run_and_persist(
             )
             return
 
-        if result.get("error") and not (result.get("trip") or {}).get("destination"):
-            fail_trip(user_id, session_id, result.get("error") or "Trip planning failed")
+        if result.get("error"):
+            existing_trip = (doc.get("trip") or {}) if doc else {}
+            if existing_trip.get("destination"):
+                # raw_query is recorded so the optimistic bubble clears and the
+                # error renders on THIS turn, not the previous one.
+                complete_trip(
+                    user_id,
+                    session_id,
+                    status="ready",
+                    trip=existing_trip,
+                    clarifying_questions=[],
+                    message=(
+                        f"Your plan is unchanged - that change was not applied.\n"
+                        f"{result['error']}"
+                    ).strip(),
+                    user_text=raw_query,
+                )
+                return
+
+            # Nothing planned yet, so there is nothing to protect.
+            fail_trip(
+                user_id,
+                session_id,
+                result.get("error") or "Trip planning failed",
+                user_text=raw_query,
+            )
             return
 
         set_progress(user_id, session_id, "done", "Trip ready")
         message = result.get("message", "")
+        for warn in result.get("warnings") or []:
+            message = f"{message}\n{warn}"
+        if result.get("warnings"):
+            logger.info(f"Trip {session_id} completed with warnings: {result['warnings']}")
         # No silent rewrites: surface what changed on an existing trip.
         old_trip = doc.get("trip") or {}
         new_trip = result.get("trip") or {}
@@ -199,7 +224,12 @@ def _run_and_persist(
     except Exception as e:
         logger.exception(f"Trip run failed session={session_id}: {e}")
         try:
-            fail_trip(user_id, session_id, str(e))
+            fail_trip(
+                user_id,
+                session_id,
+                "Something went wrong while planning that change. Please try again.",
+                user_text=raw_query,
+            )
         except Exception:
             pass
 

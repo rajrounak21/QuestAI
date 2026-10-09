@@ -11,6 +11,7 @@ from backend.agents.travel.flights.main import run_flight_search
 from backend.auth.security import get_current_user
 from backend.database.flight_sessions import (
     delete_session,
+    get_session_search,
     get_session_with_latest_search,
     insert_search,
     list_session_history,
@@ -76,9 +77,8 @@ def _book_pair(
     """
     import json as _json
 
-    from backend.agents.travel.tools.google_flights import _get_client
+    from backend.agents.shared.serpapi_client import search as serpapi_search
 
-    client = _get_client()
     payload = {"outbound": outbound}
     if ret:
         payload["return"] = ret
@@ -90,7 +90,7 @@ def _book_pair(
     }
     if travelers > 1:
         params["adults"] = str(travelers)
-    results = client.search(params)
+    results = serpapi_search(params)
     return results.data
 
 
@@ -154,6 +154,25 @@ def list_searches(
     if not session:
         raise HTTPException(status_code=404, detail="flight session not found")
     return {"items": list_session_searches(user["id"], session_id, limit=limit)}
+
+
+@router.get("/{session_id}/searches/{search_id}")
+def get_search(
+    session_id: str, search_id: str, user: dict = Depends(get_current_user)
+) -> dict[str, Any]:
+    """Open one stored search from this session. Mongo only, no SerpApi call.
+
+    Declared after the list route and before /{session_id} so neither of them
+    claims the three-segment path.
+    """
+    doc = get_session_search(user["id"], session_id, search_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="search not found in this session")
+    doc["_id"] = str(doc["_id"])
+    doc["search_id"] = doc["_id"]
+    created = doc.get("created_at")
+    doc["created_at"] = created.isoformat() if created else ""
+    return {"search": doc}
 
 
 @router.get("/{session_id}")
@@ -309,9 +328,6 @@ def booking_options(body: BookingOptionsIn, user: dict = Depends(get_current_use
 
     shaped: list[dict[str, Any]] = []
     for opt in data.get("booking_options", []):
-        # Option is either {"together": {...}} (one price, whole trip) or
-        # {"departing": {...}, "returning": {...}} (separate ticket per leg).
-        # The leg tag is kept so the UI never mixes the two meanings.
         legs: list[tuple[str, dict[str, Any]]] = []
         if isinstance(opt.get("together"), dict):
             legs = [("together", opt["together"])]

@@ -1,19 +1,12 @@
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any
 
-import serpapi
-from dotenv import load_dotenv
-
+from backend.agents.shared.serpapi_client import search as serpapi_search
 from backend.agents.travel.schemas.flight import CabinClass, FlightSearchRequest, TripType
 
-load_dotenv(override=True)
-
 logger = logging.getLogger(__name__)
-
-_client: serpapi.Client | None = None
 
 CABIN_CLASS_MAP = {
     CabinClass.ECONOMY: "1",
@@ -28,19 +21,7 @@ TRIP_TYPE_MAP = {
 }
 
 
-def _get_client() -> serpapi.Client:
-    global _client
-    if _client is None:
-        api_key = os.getenv("SERP_API_KEY")
-        if not api_key:
-            raise ValueError("SERP_API_KEY not found in environment")
-        _client = serpapi.Client(api_key=api_key)
-    return _client
-
-
 def google_flights_search(request: FlightSearchRequest) -> dict[str, Any]:
-    client = _get_client()
-
     params: dict[str, Any] = {
         "engine": "google_flights",
         "departure_id": request.origin,
@@ -59,12 +40,12 @@ def google_flights_search(request: FlightSearchRequest) -> dict[str, Any]:
         params["adults"] = str(request.passengers)
 
     logger.info(
-        f"SerpAPI Google Flights: {request.origin} → {request.destination} "
+        f"SerpAPI Google Flights: {request.origin} -> {request.destination} "
         f"on {request.departure_date} (type={params['type']})"
     )
 
     try:
-        results = client.search(params)
+        results = serpapi_search(params)
         data = results.data
         logger.info(
             f"SerpAPI response: {len(data.get('best_flights', []))} best, "
@@ -87,7 +68,6 @@ def google_flights_return_options(
 ) -> dict[str, Any]:
     """Step 2 of the round-trip chain: return-leg options for a selected
     outbound flight. Entries carry booking_token for step 3."""
-    client = _get_client()
     params: dict[str, Any] = {
         "engine": "google_flights",
         "departure_token": departure_token,
@@ -104,7 +84,7 @@ def google_flights_return_options(
         params["adults"] = str(travelers)
     logger.info("SerpAPI Google Flights: return-leg options lookup")
     try:
-        results = client.search(params)
+        results = serpapi_search(params)
         data = results.data
         logger.info("SerpAPI response: return-leg options received")
         return data
@@ -125,10 +105,9 @@ def google_flights_booking_options(
 ) -> dict[str, Any]:
     """Follow-up lookup: booking options (book with airline/OTA) for one flight.
 
-    Costs 1 extra SerpApi search — call on demand (selected flight), never bulk.
+    Costs 1 extra SerpApi search - call on demand (selected flight), never bulk.
     SerpApi needs the original search context alongside the token.
     """
-    client = _get_client()
     is_round = trip_type == "round_trip" and bool(return_date)
     params: dict[str, Any] = {
         "engine": "google_flights",
@@ -146,7 +125,7 @@ def google_flights_booking_options(
         params["adults"] = str(travelers)
     logger.info("SerpAPI Google Flights: booking options lookup")
     try:
-        results = client.search(params)
+        results = serpapi_search(params)
         data = results.data
         logger.info(f"SerpAPI response: {len(data.get('booking_options', []))} booking options")
         return data

@@ -1,0 +1,369 @@
+{
+  "name": "Job Alert System",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes"
+            }
+          ]
+        }
+      },
+      "id": "13c2f093-c6d4-4101-bf0d-ef53458f4a53",
+      "name": "Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -768,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "url": "{{ $env.QUESTAI_BACKEND_URL }}/api/jobs/alerts/due",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Service-Key",
+              "value": "{{ $env.N8N_SERVICE_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "09a8a90d-8cf8-4dd3-88b7-2709323d2aac",
+      "name": "Get Due Alerts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -464,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "due_alerts",
+        "options": {}
+      },
+      "id": "3094b040-8e8d-47fa-baa0-0330d661accc",
+      "name": "Split Due Alerts",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -240,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.QUESTAI_BACKEND_URL }}/api/jobs/alerts/{{ $json.alert_id }}/run",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Service-Key",
+              "value": "{{ $env.N8N_SERVICE_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "70050d4f-9e4a-4fa1-bfa9-e16d6e1efd1a",
+      "name": "Run Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        320,
+        64
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "count-gt-0",
+              "leftValue": "={{ $json.count }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "be774dd0-0488-479a-a46f-e3ca7de0a019",
+      "name": "Has New Jobs?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        544,
+        -32
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// â”€â”€ JobPulse â€” New Job Alert Email Builder â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€\n// Reads the current alert + run data, builds a premium branded HTML email,\n// and returns { to, subject, html, count } for the next node (e.g. Send Email).\n\nconst alert = $('Loop Over Alerts').item.json;\nconst run = $json;\n\nconst jobs = Array.isArray(run.new_jobs) ? run.new_jobs : [];\nconst count = typeof run.count === 'number' ? run.count : jobs.length;\n\nconst BRAND = 'QuestAi';\nconst LOGO_URL = 'https://plain-apac-prod-public.komododecks.com/202609/25/Vks3Yyo4JP6b6VuUr1UW/image.png';\nconst INK = '#0f0f14';\nconst ACCENT = '#6366f1';\nconst ACCENT_2 = '#a855f7';\nconst APPLY_COLOR = '#10b981';\nconst CARD_BG = '#ffffff';\nconst PAGE_BG = '#f4f4f7';\n\nconst query = alert.query || 'your search';\nconst location = alert.location || '';\nconst email = alert.email || '';\nconst today = new Date().toLocaleDateString('en-US', {\n  year: 'numeric',\n  month: 'long',\n  day: 'numeric',\n});\n\n// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€\nconst esc = (s) =>\n  String(s == null ? '' : s)\n    .replace(/&/g, '&amp;')\n    .replace(/</g, '&lt;')\n    .replace(/>/g, '&gt;')\n    .replace(/\"/g, '&quot;');\n\nconst pick = (obj, keys) => {\n  for (const k of keys) {\n    if (obj[k] != null && String(obj[k]).trim() !== '') return obj[k];\n  }\n  return '';\n};\n\nconst initials = (name) =>\n  esc(\n    String(name || '?')\n      .trim()\n      .split(/\\s+/)\n      .slice(0, 2)\n      .map((w) => w[0])\n      .join('')\n      .toUpperCase()\n  );\n\nconst metaPill = (label, val) => {\n  if (val == null || String(val).trim() === '') return '';\n  return (\n    '<span style=\"display:inline-block;background:#f4f4f7;color:#4b5563;font-size:12px;' +\n    'font-weight:600;padding:5px 11px;border-radius:8px;margin:0 6px 6px 0;\">' +\n    '<span style=\"color:#9ca3af;font-weight:500;\">' + esc(label) + ':</span> ' + esc(val) +\n    '</span>'\n  );\n};\n\n// â”€â”€ Job cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€\nconst cards = jobs\n  .map((j, idx) => {\n    const title = pick(j, ['title', 'job_title', 'name']);\n    const company = pick(j, ['company', 'company_name', 'employer']);\n    const loc = pick(j, ['location', 'job_location', 'city']);\n    const posted = pick(j, ['posted_at', 'posted_time', 'posted', 'date_posted']);\n    const empType = pick(j, ['employment_type', 'job_type', 'type']);\n    const workMode = pick(j, ['work_mode', 'workplace_type', 'remote']);\n    const salary = pick(j, ['salary', 'salary_range', 'compensation']);\n    const viewUrl = pick(j, ['job_url', 'url', 'link', 'view_url', 'share_link']);\n    const applyUrl = pick(j, ['apply_url', 'application_url']);\n\n    let highlights = j.highlights || j.skills || j.tags || [];\n    if (typeof highlights === 'string') highlights = [highlights];\n\n    const pills = [\n      metaPill('Location', loc),\n      metaPill('Posted', posted),\n      metaPill('Type', empType),\n      metaPill('Mode', workMode),\n      metaPill('Salary', salary),\n    ].join('');\n\n    const chips =\n      Array.isArray(highlights) && highlights.length\n        ? '<div style=\"margin-top:10px;\">' +\n          highlights\n            .map(\n              (h) =>\n                '<span style=\"display:inline-block;background:linear-gradient(135deg,#eef2ff,#f5f3ff);' +\n                'color:' + ACCENT + ';font-size:11px;font-weight:700;padding:4px 10px;border-radius:9999px;' +\n                'margin:0 6px 6px 0;border:1px solid #e0e7ff;\">' + esc(h) + '</span>'\n            )\n            .join('') +\n          '</div>'\n        : '';\n\n    let buttons = '<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\"><tr>';\n    if (viewUrl) {\n      buttons +=\n        '<td style=\"padding-right:10px;\"><a href=\"' + esc(viewUrl) + '\" ' +\n        'style=\"display:inline-block;background:#ffffff;color:' + INK + ';text-decoration:none;' +\n        'font-size:13px;font-weight:700;padding:10px 18px;border-radius:9px;border:1.5px solid #e5e7eb;\">' +\n        'View Job</a></td>';\n    }\n    if (applyUrl) {\n      buttons +=\n        '<td><a href=\"' + esc(applyUrl) + '\" ' +\n        'style=\"display:inline-block;background:' + APPLY_COLOR + ';color:#ffffff;text-decoration:none;' +\n        'font-size:13px;font-weight:700;padding:10px 18px;border-radius:9px;\">Apply Now â†’</a></td>';\n    }\n    buttons += '</tr></table>';\n\n    return (\n      '<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" ' +\n      'style=\"background:' + CARD_BG + ';border-radius:16px;margin:0 0 14px 0;' +\n      'border:1px solid #ececf1;box-shadow:0 1px 2px rgba(16,16,20,0.04);\">' +\n      '<tr><td style=\"padding:20px;\">' +\n      '<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr>' +\n      '<td width=\"44\" style=\"vertical-align:top;padding-right:14px;\">' +\n      '<div style=\"width:44px;height:44px;border-radius:11px;background:linear-gradient(135deg,' + ACCENT + ',' + ACCENT_2 + ');' +\n      'color:#ffffff;font-size:15px;font-weight:800;text-align:center;line-height:44px;\">' +\n      initials(company || title) + '</div>' +\n      '</td>' +\n      '<td style=\"vertical-align:top;\">' +\n      (idx === 0 && jobs.length > 1\n        ? '<span style=\"display:inline-block;background:#111827;color:#ffffff;font-size:10px;font-weight:800;' +\n          'letter-spacing:0.5px;padding:2px 8px;border-radius:6px;margin-bottom:6px;\">JUST POSTED</span><br>'\n        : '') +\n      (title ? '<div style=\"font-size:16px;font-weight:800;color:' + INK + ';line-height:1.35;\">' + esc(title) + '</div>' : '') +\n      (company ? '<div style=\"font-size:13.5px;color:#6b7280;font-weight:600;margin-top:2px;\">' + esc(company) + '</div>' : '') +\n      '</td></tr></table>' +\n      (pills ? '<div style=\"margin-top:12px;\">' + pills + '</div>' : '') +\n      chips +\n      '<div style=\"margin-top:16px;\">' + buttons + '</div>' +\n      '</td></tr></table>'\n    );\n  })\n  .join('');\n\nconst noJobsBlock = !jobs.length\n  ? '<div style=\"text-align:center;color:#9ca3af;font-size:14px;padding:32px 0;\">No job details were included in this run.</div>'\n  : '';\n\n// â”€â”€ Subject + meta summary â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€\nconst plural = count === 1 ? 'job' : 'jobs';\nconst subject = 'ðŸ”” ' + count + ' new ' + plural + ' for ' + query;\n\n// â”€â”€ Full HTML email â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€\nconst html =\n  '<!DOCTYPE html><html><head><meta charset=\"utf-8\">' +\n  '<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"></head>' +\n  '<body style=\"margin:0;padding:0;background:' + PAGE_BG + ';font-family:-apple-system,Segoe UI,Roboto,Arial,Helvetica,sans-serif;\">' +\n  '<div style=\"max-width:600px;margin:0 auto;padding:28px 16px;\">' +\n\n  // Header â€” logo + brand wordmark\n  '<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin-bottom:18px;\">' +\n  '<tr><td style=\"text-align:center;padding-bottom:6px;\">' +\n  '<img src=\"' + esc(LOGO_URL) + '\" alt=\"' + esc(BRAND) + '\" width=\"56\" height=\"56\" ' +\n  'style=\"display:inline-block;border-radius:14px;box-shadow:0 4px 14px rgba(99,102,241,0.25);\">' +\n  '<div style=\"margin-top:10px;font-size:15px;font-weight:800;color:' + INK + ';letter-spacing:0.3px;\">' +\n  esc(BRAND) + '</div>' +\n  '</td></tr>' +\n  '</table>' +\n\n  // Hero banner\n  '<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" ' +\n  'style=\"background:linear-gradient(135deg,' + ACCENT + ' 0%,' + ACCENT_2 + ' 100%);border-radius:20px;margin-bottom:16px;\">' +\n  '<tr><td style=\"padding:26px 26px 24px;text-align:center;\">' +\n  '<div style=\"color:rgba(255,255,255,0.85);font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;\">' +\n  esc(today) + '</div>' +\n  '<div style=\"color:#ffffff;font-size:26px;font-weight:800;line-height:1.25;\">' +\n  esc(count) + ' new ' + plural + '</div>' +\n  '<div style=\"color:rgba(255,255,255,0.9);font-size:14.5px;font-weight:500;margin-top:4px;\">' +\n  'matching &quot;' + esc(query) + (location ? '&quot; near ' + esc(location) : '&quot;') + '</div>' +\n  '</td></tr></table>' +\n\n  // Job cards\n  cards +\n  noJobsBlock +\n\n  // Footer\n  '<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin-top:8px;\">' +\n  '<tr><td style=\"text-align:center;padding:18px 10px 4px;\">' +\n  '<div style=\"font-size:12px;color:#9ca3af;line-height:1.6;\">' +\n  'Sent to ' + (email ? esc(email) : 'you') + ' by ' + esc(BRAND) + ' because you subscribed to job alerts for &quot;' + esc(query) + '&quot;.' +\n  '</div>' +\n  '</td></tr></table>' +\n\n  '</div></body></html>';\n\nreturn [{ json: { to: email, subject: subject, html: html, count: count } }];"
+      },
+      "id": "6cc4dea1-7c9e-4773-b511-8c512757c7e0",
+      "name": "Build Email HTML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        768,
+        -32
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "3e7fcb7e-f269-4244-9d7e-71a66b236354",
+      "name": "Send Job Alert Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        992,
+        144
+      ],
+      "webhookId": "7d394378-2494-4709-a0e9-8abdbe5ee253",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "ba0aSVjEqNy86mlL",
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "7d8843b9-a9f2-4aab-be14-e720ac0ef666",
+      "name": "Loop Over Alerts",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        96,
+        432
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "7082d420-87a2-4c8a-b0d2-4a33cf926047",
+      "name": "Email Send Failed",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1216,
+        208
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "be8ca514-496f-4d9e-87b9-0949cfd19fe2",
+      "name": "Alert Run Failed",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        544,
+        160
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every 5 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Get Due Alerts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Due Alerts": {
+      "main": [
+        [
+          {
+            "node": "Split Due Alerts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Due Alerts": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Alerts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Alert": {
+      "main": [
+        [
+          {
+            "node": "Has New Jobs?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Alert Run Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has New Jobs?": {
+      "main": [
+        [
+          {
+            "node": "Build Email HTML",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Alerts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Email HTML": {
+      "main": [
+        [
+          {
+            "node": "Send Job Alert Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Job Alert Email": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Alerts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email Send Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Alerts": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Run Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Send Failed": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Alerts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alert Run Failed": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Alerts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "caa3cf88-03ea-4cd5-887b-fe8f1fc51f08",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "196da6338791b22d45513ca0d65bc23b947c150127f3da5e4617f053d2940076"
+  },
+  "nodeGroups": [
+    {
+      "id": "54b88243-ae23-4552-ae05-a8d6bd27e3ca",
+      "name": "Fetch due alerts",
+      "nodeIds": [
+        "09a8a90d-8cf8-4dd3-88b7-2709323d2aac",
+        "3094b040-8e8d-47fa-baa0-0330d661accc"
+      ],
+      "description": "Every 5 minutes, asks FastAPI which alerts are due right now and splits them into one item per alert."
+    },
+    {
+      "id": "810c45bf-0176-4357-9461-2a795988ff2a",
+      "name": "Process each alert",
+      "nodeIds": [
+        "7d8843b9-a9f2-4aab-be14-e720ac0ef666",
+        "70050d4f-9e4a-4fa1-bfa9-e16d6e1efd1a",
+        "be774dd0-0488-479a-a46f-e3ca7de0a019",
+        "6cc4dea1-7c9e-4773-b511-8c512757c7e0",
+        "3e7fcb7e-f269-4244-9d7e-71a66b236354",
+        "be8ca514-496f-4d9e-87b9-0949cfd19fe2",
+        "7082d420-87a2-4c8a-b0d2-4a33cf926047"
+      ],
+      "description": "For each due alert, runs it in FastAPI, and emails a branded job digest only when new jobs come back."
+    }
+  ],
+  "id": "sUo82doVSjsYboap",
+  "tags": []
+}

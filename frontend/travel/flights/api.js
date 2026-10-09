@@ -21,6 +21,9 @@ export const flightsApi = {
     unwrap(await authFetch(`/api/flights/${session_id}`)),
   searches: async (session_id, limit = 20) =>
     unwrap(await authFetch(`/api/flights/${session_id}/searches?limit=${limit}`)),
+  // One stored search with its flights. Mongo read, no SerpApi call.
+  openSearch: async (session_id, search_id) =>
+    unwrap(await authFetch(`/api/flights/${session_id}/searches/${search_id}`)),
   searchAgain: async (session_id, query) =>
     unwrap(
       await authFetch(`/api/flights/${session_id}/search`, {

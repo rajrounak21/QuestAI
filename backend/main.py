@@ -24,6 +24,8 @@ from backend.agents.travel.trips.api.router import router as trips_router
 from backend.agents.assistant.api.router import router as assistant_router
 from backend.agents.router.api.router import router as agent_router
 from backend.database.collections import ensure_research_indexes, ensure_shopping_indexes, ensure_flight_indexes, ensure_hotel_indexes, ensure_trip_indexes, ensure_job_indexes
+from backend.auth.security import get_current_user
+from fastapi import Depends
 
 app = FastAPI(title="QuestAI API", version="0.1.0")
 
@@ -56,14 +58,8 @@ app.include_router(shopping_router)
 app.include_router(flights_router)
 app.include_router(hotels_router)
 app.include_router(trips_router)
-# Universal layer: the intent router and the conversational Assistant. Mounted
-# before the dynamic /{session_id} routers are irrelevant here because these
-# own distinct first path segments (/api/agent, /api/assistant).
 app.include_router(agent_router)
 app.include_router(assistant_router)
-# job_alerts_router must be mounted BEFORE jobs_router: jobs_router owns
-# GET /api/jobs/{session_id}, and "/api/jobs/alerts" has the same segment count,
-# so mounting jobs first would swallow it and 401 the alert list.
 app.include_router(job_alerts_router)
 app.include_router(jobs_router)
 
@@ -92,6 +88,14 @@ def _ensure_indexes():
         pass
     try:
         ensure_job_indexes()
+    except Exception:
+        pass
+    try:
+        from backend.agents.research.tools.research_cache import (
+            ensure_research_cache_indexes,
+        )
+
+        ensure_research_cache_indexes()
     except Exception:
         pass
 

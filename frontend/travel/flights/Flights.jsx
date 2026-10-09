@@ -11,8 +11,6 @@ import { useRouterPrefill } from "../../src/shared/useRouterPrefill";
 import RouteReceipt from "../../src/shared/RouteReceipt";
 import LoadingResults from "../../src/shared/LoadingResults";
 import { getToken } from "../../auth/api";
-// Styles shared with the hotels and trips pages. Flights.css is gone: it had no
-// rules of its own, every one of them lived in the other two stylesheets too.
 import "../shared/travel.css";
 import "./search-log.css";
 
@@ -31,11 +29,17 @@ export default function Flights() {
   const [filters, setFilters] = useState({ ...DEFAULT_FILTERS });
 
   const [sessions, setSessions] = useState([]);
+const [historyError, setHistoryError] = useState("");
   const [sessionTitle, setSessionTitle] = useState("");
   // Every search run in this session, newest first. More than one means the
   // user changed the route or dates inside the same workspace.
   const [searchLog, setSearchLog] = useState([]);
   const [lastSearched, setLastSearched] = useState("");
+  // Which search is on screen. The newest one by default; clicking an earlier
+  // row swaps the results to that search without running a new one.
+  const [openSearchId, setOpenSearchId] = useState("");
+  const [openingId, setOpeningId] = useState("");
+  const [viewingOlder, setViewingOlder] = useState(false);
 
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [toast, setToast] = useState("");
@@ -48,6 +52,8 @@ export default function Flights() {
 
   const autoRunRef = useRef(false);
   const toastTimer = useRef(null);
+  // Newest search of the open session, kept so "back to latest" is instant.
+  const latestRef = useRef(null);
 
   const showToast = (msg) => {
     setToast(msg);
@@ -61,7 +67,60 @@ export default function Flights() {
     try {
       const data = await flightsApi.history(20);
       setSessions(data.items || []);
-    } catch { /* history stays empty */ }
+      setHistoryError("");
+    } catch (e) {
+      if (e.code === "unauthorized") return;
+      setHistoryError(e.message || "Could not load your saved searches.");
+    }
+  };
+
+  const loadSearchLog = async (sid) => {
+    try {
+      const data = await flightsApi.searches(sid);
+      setSearchLog(data.items || []);
+    } catch { /* list is a nicety, results still load */ }
+  };
+
+  // Everything that puts a search on screen goes through here, so the newest
+  // search and a reopened older one end up in exactly the same state.
+  const showSearch = (doc, { older = false } = {}) => {
+    setFlights(doc.flights || []);
+    setFlightParams(doc.params || null);
+    setSessionTitle(doc.query || "");
+    // Mongo hands back a Date on the session route and an ISO string on the
+    // search route; normalise so timeAgo never has to guess.
+    const when = doc.created_at;
+    setLastSearched(
+      when instanceof Date ? when.toISOString() : when || new Date().toISOString()
+    );
+    setOpenSearchId(doc.search_id || doc._id || "");
+    setViewingOlder(older);
+    setHasSearched(true);
+    setError(null);
+    setFollowUp(null);
+    setSelected(null);
+  };
+
+  // Open one earlier search from the list. Stored results only - no SerpApi,
+  // no new search row, so browsing history never inflates the session.
+  const openSavedSearch = async (row) => {
+    if (!sessionId || !row?.search_id || openingId) return;
+    if (row.search_id === openSearchId) return;
+    setOpeningId(row.search_id);
+    try {
+      const data = await flightsApi.openSearch(sessionId, row.search_id);
+      if (data.search) showSearch(data.search, { older: true });
+      loadHistory();
+    } catch (err) {
+      if (err.code === "unauthorized") navigate("/login", { replace: true });
+      else setError(err.message || "Could not open that search.");
+    } finally {
+      setOpeningId("");
+    }
+  };
+
+  const backToLatest = () => {
+    if (latestRef.current) showSearch(latestRef.current);
   };
 
   useEffect(() => {
@@ -83,6 +142,9 @@ export default function Flights() {
     setSelected(null);
     setFlightParams(null);
     setLastSearched("");
+    latestRef.current = null;
+    setOpenSearchId("");
+    setViewingOlder(false);
   };
 
   const handleSearch = async (query, opts = {}) => {
@@ -103,10 +165,20 @@ export default function Flights() {
       setFlightParams(result.params || null);
       setSessionTitle(q);
       setLastSearched(new Date().toISOString());
+      // What just ran is now the newest search in this session.
+      latestRef.current = {
+        query: q,
+        flights: result.flights || [],
+        params: result.params || null,
+        created_at: new Date().toISOString(),
+      };
+      setOpenSearchId("");
+      setViewingOlder(false);
       if (result.session_id && result.session_id !== sessionId) {
         navigate(`/flights/${result.session_id}`, { replace: !sessionId });
       }
       loadHistory();
+      loadSearchLog(result.session_id || sessionId);
     } catch (err) {
       if (err.code === "unauthorized") {
         navigate("/login", { replace: true });
@@ -132,16 +204,16 @@ export default function Flights() {
       .then((d) => {
         if (!alive) return;
         const latest = d.latest;
-        // The latest search row's query, not session.title. Title is written
-        // with $setOnInsert so it stays frozen at the session's first search,
-        // while origin/destination in the same doc are $set every time - so
-        // session.title can describe a completely different flight than the
-        // results beside it. The searches collection already holds the truth.
-        setSessionTitle(latest?.query || d.session?.title || d.session?.query || "");
-        setLastSearched(d.session?.last_search_at || latest?.created_at || "");
-        setFlights(latest?.flights || []);
-        setFlightParams(latest?.params || d.session?.params || null);
-        setHasSearched(true);
+        if (latest) {
+          latestRef.current = { ...latest, search_id: latest._id };
+          showSearch(latestRef.current);
+        } else {
+          latestRef.current = null;
+          setSessionTitle(d.session?.title || d.session?.query || "");
+          setLastSearched(d.session?.last_search_at || "");
+          setFlightParams(d.session?.params || null);
+          setHasSearched(false);
+        }
       })
       .catch((e) => {
         if (!alive) return;
@@ -155,10 +227,7 @@ export default function Flights() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
-  // Earlier searches in this session. Each one is its own row, so without this
-  // they existed only in Mongo and the page showed the newest one as if it were
-  // the only one. Mongo read, no SerpApi cost.
-  useEffect(() => {
+useEffect(() => {
     if (!sessionId) {
       setSearchLog([]);
       return;
@@ -173,9 +242,6 @@ export default function Flights() {
     return () => { alive = false; };
   }, [sessionId]);
 
-  // ?q= from the dashboard only PREFILLS the form. It used to call
-  // handleSearch(q) here, which ran a live search the moment the page opened.
-  // The param is still stripped so a refresh can't re-fill over the user's edits.
   useEffect(() => {
     const q = searchParams.get("q");
     if (!q || autoRunRef.current || sessionId) return;
@@ -286,18 +352,41 @@ export default function Flights() {
               <h2>{sessionTitle || "Saved flights"}</h2>
               {lastSearched && <p className="sess-sub">Last searched {timeAgo(lastSearched)} · prices may have changed</p>}
               {searchLog.length > 1 && (
-                <details className="search-log">
+                <details className="search-log" open={viewingOlder}>
                   <summary>{searchLog.length} searches in this session</summary>
                   <ul>
-                    {searchLog.map((s, i) => (
-                      <li key={`${s.created_at}-${i}`}>
-                        <span>{s.query}</span>
-                        <span className="search-log-meta">
-                          {s.flight_count ?? 0} flights · {timeAgo(s.created_at)}
-                        </span>
-                      </li>
-                    ))}
+                    {searchLog.map((s, i) => {
+                      const active = s.search_id === openSearchId;
+                      return (
+                        <li key={s.search_id || `${s.created_at}-${i}`} className={active ? "is-open" : ""}>
+                          <button
+                            type="button"
+                            className="search-log-row"
+                            onClick={() => openSavedSearch(s)}
+                            disabled={!!openingId && !active}
+                            aria-current={active ? "true" : undefined}
+                          >
+                            <span className="search-log-q">
+                              {s.query}
+                              {i === 0 && <em className="search-log-tag">latest</em>}
+                            </span>
+                            <span className="search-log-meta">
+                              {openingId === s.search_id ? (
+                                <span className="spinner-small" aria-label="Opening" />
+                              ) : (
+                                `${s.flight_count ?? 0} flights · ${timeAgo(s.created_at)}`
+                              )}
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
                   </ul>
+                  {viewingOlder && (
+                    <button type="button" className="search-log-back" onClick={backToLatest}>
+                      ↩ Back to latest search
+                    </button>
+                  )}
                 </details>
               )}
             </div>
@@ -365,7 +454,12 @@ export default function Flights() {
                 {sessions.length > 0 && <span className="recent-count">{sessions.length}</span>}
                 {sessions.length > 0 && <span className="recent-hint">Opens saved results · no new search spent</span>}
               </div>
-              {sessions.length === 0 ? (
+              {historyError ? (
+                <div className="recent-empty">
+                  {historyError}{" "}
+                  <button className="btn-ghost" onClick={loadHistory}>Retry</button>
+                </div>
+              ) : sessions.length === 0 ? (
                 <div className="recent-empty">No flight history yet — your searches will appear here.</div>
               ) : (
                 <div className="recent-grid">

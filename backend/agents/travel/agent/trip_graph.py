@@ -4,7 +4,7 @@ import json
 import logging
 import os
 import sys
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from langgraph.graph import END, START, StateGraph
@@ -18,7 +18,6 @@ from backend.agents.travel.agent.nodes import (
     extract_trip_params_node,
     detect_impact_node,
     validate_trip_params_node,
-    _parse_json,
 )
 from backend.agents.travel.services.trip_memory import current_user_id, trip_memory
 from backend.agents.travel.schemas.trip import (
@@ -71,6 +70,54 @@ def load_session(state: TripState) -> dict[str, Any]:
         "trip_session": session.to_dict(),
         "progress_steps": [f"Created new trip: {session.trip_id}"],
     }
+
+
+_ORIGIN_CURRENCY = {
+    "mumbai": "INR", "delhi": "INR", "bangalore": "INR", "bengaluru": "INR",
+    "chennai": "INR", "kolkata": "INR", "hyderabad": "INR", "pune": "INR",
+    "ahmedabad": "INR", "jaipur": "INR", "goa": "INR", "new delhi": "INR",
+    "london": "GBP", "paris": "EUR", "berlin": "EUR", "rome": "EUR",
+    "madrid": "EUR", "amsterdam": "EUR", "dubai": "AED", "doha": "QAR",
+    "singapore": "SGD", "tokyo": "JPY", "osaka": "JPY", "seoul": "KRW",
+    "bangkok": "THB", "kual lumpur": "MYR", "jakarta": "IDR",
+    "new york": "USD", "los angeles": "USD", "san francisco": "USD",
+    "chicago": "USD", "toronto": "CAD", "melbourne": "AUD", "sydney": "AUD",
+}
+
+
+def trip_currency(trip_data: dict[str, Any]) -> str:
+    """One currency for the whole trip: flights, hotels and research.
+
+    A stored currency is always respected, "USD" included. Only an EMPTY value
+    is treated as unstated and inferred from the origin. Treating "USD" as
+    unset was actively harmful: a trip budgeted in dollars got reinterpreted as
+    rupees, and a per-night cap of 114 INR filtered out every hotel.
+    """
+    budget = trip_data.get("budget") or {}
+    cur = str(budget.get("currency") or "").strip().upper()
+    if len(cur) == 3 and cur.isalpha():
+        return cur
+    origin = str(trip_data.get("origin") or "").strip().lower()
+    dest = str(trip_data.get("destination") or "").strip().lower()
+    return _ORIGIN_CURRENCY.get(origin) or _ORIGIN_CURRENCY.get(dest) or "USD"
+
+
+def search_error_detail(exc: Exception) -> str:
+    """A short, user-safe reason for a failed provider call.
+
+    Never returns the raw exception: provider errors embed the full request URL,
+    which carries the SerpApi key.
+    """
+    text = str(exc).lower()
+    if "400" in text or "bad request" in text:
+        return "the search provider rejected those dates"
+    if "401" in text or "unauthorized" in text:
+        return "the search provider rejected our credentials"
+    if "429" in text:
+        return "the search provider is rate limiting us"
+    if "timed out" in text or "timeout" in text:
+        return "the search provider timed out"
+    return "provider error"
 
 
 def _clean_budget_number(value: Any) -> float | None:
@@ -206,7 +253,15 @@ def _merge_for_preview(
             extracted.get("travelers"), stored.get("travelers", 2)
         ),
         "budget": {
-            "currency": e_bud.get("currency") or s_bud.get("currency", "USD"),
+            # Resolved the same way the searches resolve it, so the confirm
+            # line can never promise a currency the plan will not use.
+            "currency": trip_currency(
+                {
+                    "origin": extracted.get("origin") or stored.get("origin", ""),
+                    "destination": extracted.get("destination") or stored.get("destination", ""),
+                    "budget": e_bud or s_bud or {},
+                }
+            ),
             "max_total": max_total,
         },
         "hotel_preferences": extracted.get("hotel_preferences")
@@ -235,7 +290,8 @@ def _preview_summary(preview: dict[str, Any]) -> str:
         bits.append(f"{preview['travelers']} travelers")
     max_total = (preview.get("budget") or {}).get("max_total")
     if max_total is not None:
-        bits.append(f"${max_total:g}")
+        cur = str((preview.get("budget") or {}).get("currency") or "USD").upper()
+        bits.append(f"{max_total:g} {cur}")
     return (
         "Got it — "
         + ", ".join(bits)
@@ -260,10 +316,6 @@ def update_trip_state(state: TripState) -> dict[str, Any]:
             return False
         return new_val.strip().lower() != stored_val.lower()
 
-    # Location gate: ANY location change on an existing trip — whether the
-    # message was classified new_trip or follow_up, whether the value came
-    # from extract or impact — opens the form modal. Never apply silently,
-    # never rebuild silently.
     loc_changed = (
         _differs(extracted.get("destination"), stored_dest)
         or _differs(extracted.get("origin"), stored_orig)
@@ -272,9 +324,6 @@ def update_trip_state(state: TripState) -> dict[str, Any]:
     )
 
     if stored_dest and (intent == "new_trip" or loc_changed):
-        # Existing trip + new location (or new-trip message): NEVER apply or
-        # rebuild silently. Show the merged preview in a form modal; the user
-        # picks create-new-session vs overwrite there.
         if state.get("confirmed_scope") != "overwrite":
             preview = _merge_for_preview(extracted, trip_data, impact_changes)
             question = _preview_summary(preview)
@@ -358,6 +407,9 @@ def update_trip_state(state: TripState) -> dict[str, Any]:
     follow_up_target = extracted.get("follow_up_target")
     # impact / impact_changes already defined above (used by the gate).
     handled: set[str] = set()
+    # Snapshot for the return-date derivation below.
+    _orig_departure = session.departure_date
+    _orig_duration = session.duration_days
 
     if follow_up_type == "cost_check":
         flight_cost = session.budget.flight_actual or 0
@@ -407,9 +459,6 @@ def update_trip_state(state: TripState) -> dict[str, Any]:
         handled.add("return_date")
 
     elif follow_up_type == "make_cheaper" or follow_up_type == "update_budget":
-        # Priority: explicit number from extract LLM > impact LLM's value (it
-        # sees the current budget in the snapshot) > documented default.
-        # No raw-message scanning here — the query belongs to the LLMs.
         new_max = _clean_budget_number((extracted.get("budget") or {}).get("max_total"))
         if new_max is None:
             new_max = _clean_budget_number(impact_changes.get("budget.max_total"))
@@ -479,17 +528,10 @@ def update_trip_state(state: TripState) -> dict[str, Any]:
         session.return_date = (dep + timedelta(days=session.duration_days)).isoformat()
         handled.add("return_date")
 
-    # Generic fallback: apply anything the impact step detected (e.g.
-    # destination/origin/travelers changes) that no branch above consumed.
-    # Hashes below then re-run exactly the affected agents.
     for path, value in impact_changes.items():
         if path in handled:
             continue
         if path in ("departure_date", "return_date"):
-            # Corroboration rule: an impact-proposed date applies only if the
-            # extractor saw the SAME date (it parses the message with today's
-            # context). An uncorroborated date is an LLM invention — drop it
-            # instead of corrupting stored dates.
             if not value or str(value) != str(extracted.get(path) or ""):
                 logger.warning(
                     f"Dropping uncorroborated LLM date {path}={value!r}"
@@ -497,18 +539,27 @@ def update_trip_state(state: TripState) -> dict[str, Any]:
                 continue
         _apply_trip_change(session, path, value)
 
+    if session.departure_date != _orig_departure or session.duration_days != _orig_duration:
+        try:
+            derived = (
+                date.fromisoformat(session.departure_date)
+                + timedelta(days=session.duration_days)
+            ).isoformat()
+        except (ValueError, TypeError):
+            logger.warning(
+                "Could not derive return_date from %s + %s days",
+                session.departure_date, session.duration_days,
+            )
+        else:
+            if session.return_date != derived:
+                logger.info(
+                    "Return date %s -> %s to match %s-day trip from %s",
+                    session.return_date, derived, session.duration_days,
+                    session.departure_date,
+                )
+            session.return_date = derived
+
     session.last_updated = datetime.now().isoformat()
-    session.flight_input_hash = compute_flight_hash(
-        session.origin, session.destination, session.departure_date,
-        session.return_date, session.travelers, session.flight_preferences,
-    )
-    session.hotel_input_hash = compute_hotel_hash(
-        session.destination, session.departure_date, session.return_date,
-        session.travelers, session.budget.max_total, session.hotel_preferences,
-    )
-    session.research_input_hash = compute_research_hash(
-        session.destination, session.interests,
-    )
     trip_memory.save(session)
 
     return {
@@ -534,9 +585,6 @@ def route_after_validate(state: TripState) -> str:
 
 
 def merge_user_answers(state: TripState) -> dict[str, Any]:
-    # Pass-through: the router already feeds the extract LLM the original
-    # request plus the user's answers, so it returns complete params.
-    # No regex parsing of the user message happens here anymore.
     logger.info("Merging user answers into trip params")
     return {
         "extracted_params": state.get("extracted_params") or {},
@@ -576,31 +624,83 @@ def run_flight_search(state: TripState) -> dict[str, Any]:
             "progress_steps": ["Reusing cached flight results"],
         }
 
-    query_parts = [f"Flights from {origin} to {destination} on {departure_date}"]
-    if return_date:
-        query_parts.append(f"returning {return_date}")
-    query_parts.append(f"for {travelers} people")
-    if flight_prefs.get("stops"):
-        query_parts.append(f"{flight_prefs['stops']} flights")
-
-    query = " ".join(query_parts)
-
     try:
-        from backend.agents.travel.agent.flight_agent import run_flight_search as search_flights
+        from backend.agents.travel.schemas.flight import CabinClass, FlightSearchRequest, TripType
+        from backend.agents.travel.services.flight_normalizer import build_search_response
+        from backend.agents.travel.tools.google_flights import google_flights_search
+
         _bump_searches(state, "flights")
-        result = search_flights(query)
 
-        flights = result.get("flights", [])
+        from backend.agents.travel.services.airport_codes import resolve_airports
 
+        origin_code, dest_code = resolve_airports(origin, destination)
+        if not origin_code or not dest_code:
+            which = "origin" if not origin_code else "destination"
+            place = origin if which == "origin" else destination
+            logger.warning(f"No IATA code for trip {which}: {place!r}")
+            return {
+                "flight_results": [],
+                "warnings": [
+                    f"I could not tell which airport serves your {which} "
+                    f"({place}) - flights were left as they were."
+                ],
+                "progress_steps": [f"Could not resolve {which} airport"],
+            }
+
+        cabin_map = {
+            "economy": CabinClass.ECONOMY,
+            "premium_economy": CabinClass.PREMIUM_ECONOMY,
+            "business": CabinClass.BUSINESS,
+            "first": CabinClass.FIRST,
+        }
+        currency = trip_currency(trip_data)
+        request_dict = {
+            "origin": origin_code,
+            "destination": dest_code,
+            "departure_date": departure_date,
+            "return_date": return_date,
+            "trip_type": TripType.ROUND_TRIP if return_date else TripType.ONE_WAY,
+            "passengers": int(travelers or 1),
+            "cabin_class": cabin_map.get(
+                flight_prefs.get("cabin_class") or flight_prefs.get("cabin") or "economy",
+                CabinClass.ECONOMY,
+            ),
+            "currency": currency,
+        }
+        raw = google_flights_search(FlightSearchRequest(**request_dict))
+        response = build_search_response(request_dict, raw)
+        flights = [f.model_dump() for f in response.flights]
+
+        if not flights:
+            # Empty is not success - report it instead of falling back silently.
+            return {
+                "flight_results": [],
+                "warnings": [
+                    "No flights came back for those dates - "
+                    "showing your last saved results."
+                ],
+                "progress_steps": ["No flights found"],
+            }
+
+        # Hash travels with the results: an unchanged revision reuses these,
+        # a changed one re-searches.
+        trip_data["flight_input_hash"] = new_hash
         return {
             "flight_results": flights[:10],
             "progress_steps": [f"Found {len(flights)} flight options"],
         }
     except Exception as e:
         logger.error(f"Flight search failed: {e}")
+        # Say so. Swallowing this is how a failed refresh still produced
+        # "Your trip is ready!" over stale cards with no warning.
         return {
             "flight_results": [],
-            "progress_steps": ["Flight search failed, continuing"],
+            "warnings": [
+                "Couldn't refresh flights"
+                + (f" ({search_error_detail(e)})" if search_error_detail(e) else "")
+                + " - showing your last saved results."
+            ],
+            "progress_steps": ["Flight search failed"],
         }
 
 
@@ -623,42 +723,60 @@ def run_hotel_search(state: TripState) -> dict[str, Any]:
             "progress_steps": ["Reusing cached hotel results"],
         }
 
-    query_parts = [f"Hotels in {destination}"]
-    if departure_date and return_date:
-        query_parts.append(f"from {departure_date} to {return_date}")
-    elif departure_date:
-        query_parts.append(f"check-in {departure_date}")
-    query_parts.append(f"for {travelers} people")
-    if hotel_prefs.get("class"):
-        query_parts.append(f"{hotel_prefs['class']}-star hotel")
-
     max_total = budget.get("max_total")
+    max_per_night = None
     if max_total and return_date and departure_date:
         dep = date.fromisoformat(departure_date)
         ret = date.fromisoformat(return_date)
         nights = max(1, (ret - dep).days)
-        max_hotel_per_night = (max_total * 0.4) / nights
-        query_parts.append(f"under ${int(max_hotel_per_night)} per night")
-
-    query = " ".join(query_parts)
+        max_per_night = (max_total * 0.4) / nights
 
     try:
-        from backend.agents.travel.agent.hotel_agent import run_hotel_search as search_hotels
+        from backend.agents.travel.schemas.hotel import HotelSearchRequest, SortBy
+        from backend.agents.travel.tools.google_hotels import google_hotels_search
+
         _bump_searches(state, "hotels")
-        result = search_hotels(query)
 
-        hotels = result.get("hotels", [])
+        currency = trip_currency(trip_data)
+        hotel_class = str(hotel_prefs.get("class") or "").rstrip("*").strip()
+        request_dict = {
+            "location": destination,
+            "check_in": departure_date,
+            "check_out": return_date or departure_date,
+            "guests": int(travelers or 1),
+            "rooms": 1,
+            "currency": currency,
+            "max_price": int(max_per_night) if max_per_night else None,
+            "min_rating": hotel_prefs.get("min_rating"),
+            "hotel_class": hotel_class or None,
+            "amenities": hotel_prefs.get("amenities") or [],
+            "sort_by": hotel_prefs.get("sort_by") or SortBy.RELEVANCE,
+        }
+        raw = google_hotels_search(HotelSearchRequest(**request_dict))
+        from backend.agents.travel.services.hotel_normalizer import normalize_hotels
 
-        if max_total and return_date and departure_date:
-            dep = date.fromisoformat(departure_date)
-            ret = date.fromisoformat(return_date)
-            nights = max(1, (ret - dep).days)
-            max_per_night = (max_total * 0.4) / nights
-            budget_hotels = [h for h in hotels if h.get("price_per_night", 0) <= max_per_night * 1.2]
+        hotels = [h.model_dump() for h in normalize_hotels(raw, currency)]
+
+        if not hotels:
+            return {
+                "hotel_results": [],
+                "warnings": [
+                    "No hotels came back for those dates and budget - "
+                    "showing your last saved results."
+                ],
+                "progress_steps": ["No hotels found"],
+            }
+
+        if max_per_night:
+            budget_hotels = [h for h in hotels if (h.get("price_per_night") or 0) <= max_per_night * 1.2]
             if len(budget_hotels) >= 3:
                 hotels = budget_hotels
-                logger.info(f"Filtered to {len(hotels)} hotels within budget (${max_per_night:.0f}/night)")
+                logger.info(
+                    f"Filtered to {len(hotels)} hotels within budget "
+                    f"({max_per_night:.0f} {currency}/night)"
+                )
 
+        trip_data["hotel_input_hash"] = new_hash
         return {
             "hotel_results": hotels[:10],
             "progress_steps": [f"Found {len(hotels)} hotel options"],
@@ -667,7 +785,12 @@ def run_hotel_search(state: TripState) -> dict[str, Any]:
         logger.error(f"Hotel search failed: {e}")
         return {
             "hotel_results": [],
-            "progress_steps": ["Hotel search failed, continuing"],
+            "warnings": [
+                "Couldn't refresh hotels"
+                + (f" ({search_error_detail(e)})" if search_error_detail(e) else "")
+                + " - showing your last saved results."
+            ],
+            "progress_steps": ["Hotel search failed"],
         }
 
 
@@ -709,9 +832,10 @@ def run_destination_research(state: TripState) -> dict[str, Any]:
             return_date=return_date,
             interests=interests,
             activity_budget=activity_budget,
-            currency=budget.get("currency", "USD"),
+            currency=trip_currency(trip_data),
         )
 
+        trip_data["research_input_hash"] = new_hash
         return {
             "destination_research": result,
             "progress_steps": ["Researched destination attractions"],
@@ -757,14 +881,7 @@ def synthesize_itinerary(state: TripState) -> dict[str, Any]:
         greeting = state.get("message", "")
         question_texts = []
         for q in clarifying:
-            q_obj = {
-                "field": q.get("field", ""),
-                "question": q.get("question", ""),
-                "why": q.get("why", ""),
-            }
-            if q.get("options"):
-                q_obj["options"] = q["options"]
-            question_texts.append(q_obj)
+            question_texts.append({k: v for k, v in q.items() if v not in (None, "", [])})
 
         return {
             "trip_session": {},
@@ -881,6 +998,41 @@ def _bump_searches(state: TripState, agent: str) -> None:
         logger.warning(f"Spend accounting failed: {e}")
 
 
+def _already_asked(state: TripState, field: str) -> bool:
+    """Has this exact field already been put to the user, unanswered?
+
+    Two sources, because neither alone works:
+      - the doc's stored clarifying_questions, which is what actually persists
+        an outstanding ask across turns and survives a reload. The conversation
+        cannot answer this: the user's reply is only appended after the graph
+        finishes, and it reads like "make it 7 days", never "departure_date".
+      - the conversation, as a fallback, for sessions that predate this.
+    """
+    uid, sid = current_user_id(), state.get("session_id")
+    if uid and sid:
+        try:
+            from backend.database.trip_sessions import get_trip_doc
+
+            doc = get_trip_doc(uid, sid) or {}
+            for q in doc.get("clarifying_questions") or []:
+                if isinstance(q, dict) and q.get("field") == field:
+                    return True
+            if any(
+                field in str(turn.get("user") or "").lower()
+                for turn in (doc.get("conversation") or [])
+                if isinstance(turn, dict)
+            ):
+                return True
+            return False
+        except Exception as e:
+            logger.warning(f"Could not read outstanding asks for loop check: {e}")
+    return any(
+        field in str(turn.get("user") or "").lower()
+        for turn in ((state.get("trip_session") or {}).get("conversation") or [])
+        if isinstance(turn, dict)
+    )
+
+
 def dispatch_agents(state: TripState) -> dict[str, Any]:
     logger.info("Conditional dispatch: running only affected agents")
     impact = state.get("impact_analysis") or {}
@@ -891,6 +1043,7 @@ def dispatch_agents(state: TripState) -> dict[str, Any]:
         "hotel_results": [],
         "destination_research": None,
         "progress_steps": [],
+        "warnings": [],
     }
 
     uid = current_user_id()
@@ -905,38 +1058,163 @@ def dispatch_agents(state: TripState) -> dict[str, Any]:
             results["progress_steps"] = ["Search budget paused"]
             return results
 
-    if "flights" in affected:
-        logger.info("Dispatch: running flight search")
-        results.update(run_flight_search(state))
-    else:
-        logger.info("Dispatch: skipping flights (not affected)")
+    if {"flights", "hotels"} & affected:
+        trip_dict = state.get("trip_session") or {}
+        past = _past_date_field(trip_dict)
+        if past:
+            logger.info(f"Dispatch: {past} is in the past, asking instead of searching")
+            readable = past.replace("_", " ")
+            today = date.today()
 
-    if "hotels" in affected:
-        logger.info("Dispatch: running hotel search")
-        results.update(run_hotel_search(state))
-    else:
-        logger.info("Dispatch: skipping hotels (not affected)")
+            asked_before = _already_asked(state, past)
+            question = {
+                "field": past,
+                # A date picker, not free text. The value arrives as a real
+                # ISO date, so there is nothing to mis-parse.
+                "inputType": "date",
+                "min": today.isoformat(),
+                "question": (
+                    "Your previous date was not a usable future date."
+                    if asked_before
+                    else "What date should this trip start?"
+                ),
+                "why": (
+                    f"Your {readable} has already passed, so live flights "
+                    "and hotels cannot be searched for it."
+                ),
+            }
+            if asked_before:
+                question["options"] = [
+                    (today + timedelta(days=offset)).isoformat()
+                    for offset in (7, 14, 30)
+                ]
+                question["placeholder"] = "Or pick a date"
+
+            return {
+                **results,
+                "trip_session": trip_dict,
+                "clarifying_questions": [question],
+                "impact_analysis": {"affected_agents": [], "changes": {}, "response": ""},
+                "message": question["question"],
+                "progress_steps": ["Dates need updating before searching"],
+            }
+
+    wants_flights = "flights" in affected
+    wants_hotels = "hotels" in affected
+    parallel: dict[str, Any] = {}
+    if wants_flights or wants_hotels:
+        from concurrent.futures import ThreadPoolExecutor
+
+        jobs = []
+        if wants_flights:
+            logger.info("Dispatch: running flight search")
+            jobs.append(("flights", run_flight_search))
+        else:
+            logger.info("Dispatch: skipping flights (not affected)")
+        if wants_hotels:
+            logger.info("Dispatch: running hotel search")
+            jobs.append(("hotels", run_hotel_search))
+        else:
+            logger.info("Dispatch: skipping hotels (not affected)")
+
+        if len(jobs) == 1:
+            parallel.update(jobs[0][1](state))
+        else:
+            with ThreadPoolExecutor(max_workers=len(jobs)) as pool:
+                futures = {pool.submit(fn, state): name for name, fn in jobs}
+                for future, name in futures.items():
+                    try:
+                        parallel.update(future.result())
+                    except Exception as e:  # a thread must never take down dispatch
+                        logger.error(f"{name} sub-agent raised: {e}")
+                        detail = search_error_detail(e)
+                        parallel.setdefault("warnings", []).append(
+                            f"Couldn't refresh {name} ({detail}) - "
+                            "showing your last saved results."
+                        )
+
+    for key in ("flight_results", "hotel_results", "progress_steps", "warnings"):
+        if key in parallel:
+            results[key] = parallel.pop(key)
 
     if "research" in affected:
         logger.info("Dispatch: running destination research")
-        results.update(run_destination_research(state))
+        research = run_destination_research(state)
+        for key in ("destination_research", "progress_steps", "warnings"):
+            if key in research:
+                if key in ("progress_steps", "warnings"):
+                    results[key] = list(results.get(key) or []) + list(research[key])
+                else:
+                    results[key] = research[key]
     else:
         logger.info("Dispatch: skipping research (not affected)")
 
     return results
 
 
+def _past_date_field(trip_data: dict[str, Any]) -> str | None:
+    """Which date field on the trip has already passed, if any."""
+    today = date.today()
+
+    def _parse(value: Any):
+        try:
+            return date.fromisoformat(str(value or ""))
+        except (ValueError, TypeError):
+            return None
+
+    dep = _parse(trip_data.get("departure_date"))
+    if dep and dep < today:
+        return "departure_date"
+    ret = _parse(trip_data.get("return_date"))
+    if ret and ret < today:
+        return "return_date"
+    return None
+
+
+def _timed(name: str, fn):
+    """Wrap a graph node so its wall-clock cost is logged and progress is
+    persisted while it runs.
+
+    Without this, "why did the follow-up take 25 seconds" could only be
+    estimated: progress_steps were never written to Mongo, so a run left no
+    trace of where the time went.
+    """
+    import time
+
+    def _wrapped(state: TripState) -> dict[str, Any]:
+        started = time.perf_counter()
+        try:
+            return fn(state)
+        finally:
+            took = time.perf_counter() - started
+            logger.info(f"trip node {name}: {took:.2f}s")
+            uid, sid = current_user_id(), state.get("session_id")
+            if uid and sid:
+                try:
+                    from backend.database.trip_sessions import set_progress
+
+                    set_progress(
+                        uid, sid, "node_done",
+                        f"{name} finished in {took:.1f}s",
+                    )
+                except Exception as e:  # timing must never break a run
+                    logger.debug(f"progress write failed after {name}: {e}")
+
+    _wrapped.__name__ = getattr(fn, "__name__", name)
+    return _wrapped
+
+
 def build_trip_graph() -> StateGraph:
     graph = StateGraph(TripState)
 
-    graph.add_node("extract_params", extract_trip_params_node)
-    graph.add_node("validate_params", validate_trip_params_node)
-    graph.add_node("merge_answers", merge_user_answers)
-    graph.add_node("detect_impact", detect_impact_node)
-    graph.add_node("load_session", load_session)
-    graph.add_node("update_state", update_trip_state)
-    graph.add_node("dispatch", dispatch_agents)
-    graph.add_node("synthesize", synthesize_itinerary)
+    graph.add_node("extract_params", _timed("extract_params", extract_trip_params_node))
+    graph.add_node("validate_params", _timed("validate_params", validate_trip_params_node))
+    graph.add_node("merge_answers", _timed("merge_answers", merge_user_answers))
+    graph.add_node("detect_impact", _timed("detect_impact", detect_impact_node))
+    graph.add_node("load_session", _timed("load_session", load_session))
+    graph.add_node("update_state", _timed("update_state", update_trip_state))
+    graph.add_node("dispatch", _timed("dispatch", dispatch_agents))
+    graph.add_node("synthesize", _timed("synthesize", synthesize_itinerary))
 
     graph.add_edge(START, "extract_params")
     graph.add_conditional_edges(

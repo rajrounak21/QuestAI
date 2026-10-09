@@ -69,17 +69,12 @@ export default function Jobs() {
   const [requireResume, setRequireResume] = useState(false);
   // Search args held while the required-resume modal is open, replayed after upload.
   const pendingSearch = useRef(null);
-  // Same idea for job alerts: the user asked to create or edit an alert but has
-  // no resume, so the upload gate opens first and the alert form is replayed
-  // once the profile lands.
   const [requireResumeForAlert, setRequireResumeForAlert] = useState(false);
   const pendingAlert = useRef(null);
   const [sessionId, setSessionId] = useState(urlSessionId || null);
   const [history, setHistory] = useState([]);
   const [deletingId, setDeletingId] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
-  // Controlled so the search form can fold itself once results are on screen —
-  // otherwise you have to scroll past it to reach the jobs you just asked for.
   const [searchOpen, setSearchOpen] = useState(true);
 
   const loadHistory = async () => {
@@ -93,11 +88,6 @@ export default function Jobs() {
 
   const confirmDeleteSession = (h) => setConfirmDelete(h);
 
-  // Tapping a saved question must do exactly one thing: refill the form. It does
-  // not search, and it does not leave the previous session's results sitting
-  // under the new chips — that reads as "a search ran". So the stale results and
-  // the session id are both dropped, which also stops the restore effect from
-  // re-populating them. The user presses "Search jobs" to actually run anything.
   const prefillFromHistory = (h) => {
     setPrefillRoles(h.target_roles || []);
     setPrefillLocations(h.locations || []);
@@ -206,15 +196,9 @@ export default function Jobs() {
         setHasProfile(false);
       });
 
-    // The alert form pre-fills the recipient from the signed-in account, so the
-    // user does not have to type their own address. Best-effort: if it fails the
-    // backend still defaults `email` to the account.
     authFetch("/api/auth/me")
       .then(async (r) => {
         if (!alive || !r) return;
-        // authFetch returns the raw fetch Response, so .json() must be awaited.
-        // Without the await, `u` is a Promise and `u.email` is always undefined,
-        // which silently left the alert form's email field empty.
         const u = await r.json();
         if (alive && u && u.email) setAccountEmail(u.email);
       })
@@ -225,18 +209,11 @@ export default function Jobs() {
     };
   }, [navigate]);
 
-  // Stable identities for the alert modal's default props. Passing `|| []`
-  // inline would allocate a new array every render, and CreateAlertModal resets
-  // its chips whenever these change — which would wipe what the user typed.
   const alertRolesKey = (profile?.target_roles || []).join("|");
   const alertLocationsKey = (profile?.locations || []).join("|");
   const alertDefaultRoles = useMemo(() => profile?.target_roles || [], [alertRolesKey]);
   const alertDefaultLocations = useMemo(() => profile?.locations || [], [alertLocationsKey]);
 
-  // Single entry point for opening the alert form, from the header bell or the
-  // panel. An alert needs the stored resume (it supplies the seniority level
-  // run_alert uses to drop senior-only postings), so if there is no profile we
-  // park the intent, open the upload gate, and continue from its onDone.
   const requestAlert = (mode, alert = null) => {
     if (!hasProfile) {
       pendingAlert.current = { mode, alert };
@@ -328,19 +305,11 @@ export default function Jobs() {
     return doSearch({ query: nextQuery, locations: nextLocations });
   };
 
-  // Deep link from the dashboard: /jobs?q=... only PREFILLS the form.
-  // It used to call doSearch() here, which fired a full search on arrival — the
-  // user landed on results they never asked to run. Now the question lands in
-  // the form and nothing happens until they press "Search jobs" themselves.
-  // The param is still stripped so a refresh can't re-prefill over their edits.
   useEffect(() => {
     const q = searchParams.get("q");
     if (!q || autoRunRef.current || urlSessionId) return;
     autoRunRef.current = true;
     setSearchParams({}, { replace: true });
-    // Merged per field: the router wins where it has a value, the text parser
-    // fills the rest. mergeFields also maps the parser's role -> roles and
-    // mode -> work_mode, so both sources land on the same names.
     const f = mergeFields(routerPrefill?.fields, parseQuery(q));
     const roles = Array.isArray(f.roles) ? f.roles : f.roles ? [f.roles] : [];
     const locations = Array.isArray(f.locations) ? f.locations : [];
@@ -351,6 +320,16 @@ export default function Jobs() {
     setTotal(0);
     setHasSearched(false);
     setSearchOpen(true);
+
+    if (!routerPrefill?.autoRun) return;
+    const fields = routerPrefill.fields || {};
+    const locs = (fields.locations || []).filter((l) =>
+      !["remote", "hybrid", "onsite", "work from home", "wfh"].includes(String(l).toLowerCase())
+    );
+    setTimeout(() => doSearch({
+      query: fields.query || fields.roles?.join(", ") || q,
+      locations: locs.length ? locs.join(", ") : undefined
+    }), 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, urlSessionId]);
 

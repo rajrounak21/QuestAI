@@ -13,6 +13,14 @@
 **/node_modules/
 **/dist/
 
+# Local scratch files
+/main.py
+
+# Standalone marketing site — not part of the app, and its screenshots/assets
+# are large. It is still served at / inside the frontend, so removing it from
+# git does not break the running app.
+landing/
+
 # IDE / OS
 .idea/
 .vscode/

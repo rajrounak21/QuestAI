@@ -53,6 +53,7 @@ class TripState(TypedDict):
     itinerary: list[dict[str, Any]]
     message: str
     error: str | None
+    warnings: Annotated[list[str], operator.add]
     progress_steps: Annotated[list[str], operator.add]
     confirmed_scope: str | None
     preview_trip: dict[str, Any] | None

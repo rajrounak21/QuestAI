@@ -22,7 +22,6 @@ export default function TripThread({
   stale,
   elapsedText,
   onSend,
-  onAnswerClarifying,
   onRetry,
   onSubmitDetails,
   renderTripDetail,
@@ -32,6 +31,10 @@ export default function TripThread({
   const [activeAction, setActiveAction] = useState(null); // value-input quick action
   const [actionValue, setActionValue] = useState("");
   const [detailsOpen, setDetailsOpen] = useState(false); // confirm-details form modal
+  // Inline "edit & resend" for a failed turn: the user often only needs to add
+  // a detail or reword, not start over.
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState("");
   const endRef = useRef(null);
 
   const status = doc?.status || null;
@@ -50,20 +53,25 @@ export default function TripThread({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [msgCount, running, status]);
 
-  // Drop the optimistic echo once the server turn arrives.
   useEffect(() => {
-    if (echo && convo.some((t) => t.user === echo.text)) setEcho(null);
+    if (!echo) return;
+    if (convo.some((t) => t.user === echo.text)) {
+      setEcho(null);
+      return;
+    }
+    if (!running) setEcho(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [convo.length]);
+  }, [convo.length, running]);
+
+  useEffect(() => {
+    if (status !== "failed") setEditing(false);
+  }, [status]);
 
   // Guard — doc is null while the session loads; every line below
   // touches doc.query / convo and would crash the whole page otherwise.
   if (!doc) return null;
 
   const items = [];
-  // Backend appends EVERY completion as a turn — including the first plan
-  // run, whose user text duplicates doc.query. Skip that duplicate user
-  // bubble (keep its assistant reply) so the input never appears twice.
   const firstDupesQuery = convo.length > 0 && doc.query && convo[0].user === doc.query;
   if (doc.query && !firstDupesQuery) items.push({ key: "q0", role: "user", text: doc.query });
   convo.forEach((t, i) => {
@@ -73,6 +81,8 @@ export default function TripThread({
     items.push({
       key: `a${i}`, role: "assistant", text: t.assistant, at: t.at,
       isLast: i === convo.length - 1,
+      // Carried so a failed turn can retry the message it represents.
+      userText: t.user,
     });
   });
 
@@ -87,6 +97,8 @@ export default function TripThread({
     setActionValue("");
     onSend(m);
   };
+
+  const answerClarifying = (text) => fire(text);
 
   const submit = (e) => {
     e.preventDefault();
@@ -132,7 +144,7 @@ export default function TripThread({
                         questions={otherQs}
                         message=""
                         loading={running}
-                        onAnswer={onAnswerClarifying}
+                        onAnswer={answerClarifying}
                       />
                     )}
                     {confirmQ && (
@@ -151,9 +163,83 @@ export default function TripThread({
                   </>
                 )}
                 {m.isLast && status === "failed" && (
-                  <button className="btn-again" onClick={onRetry}>
-                    Try again
-                  </button>
+                  <div className="trip-failed">
+                    {/* The reason already appears as this turn's message text,
+                        so it is not repeated here - only the way forward. */}
+                    <p className="trip-failed-msg">
+                      That didn&rsquo;t go through. Edit the message and send it again.
+                    </p>
+                    {editing ? (
+                      <form
+                        className="trip-edit"
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          const next = editText.trim();
+                          if (!next) return;
+                          setEditing(false);
+                          onSend(next);
+                        }}
+                      >
+                        <label className="trip-edit-label" htmlFor={`trip-edit-${m.key}`}>
+                          Edit your message
+                        </label>
+                        <textarea
+                          id={`trip-edit-${m.key}`}
+                          className="trip-edit-input"
+                          value={editText}
+                          autoFocus
+                          rows={2}
+                          disabled={running}
+                          onChange={(e) => setEditText(e.target.value)}
+                          onKeyDown={(e) => {
+                            // Enter sends, Shift+Enter makes a new line.
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              e.currentTarget.form?.requestSubmit();
+                            }
+                            if (e.key === "Escape") {
+                              e.preventDefault();
+                              setEditing(false);
+                            }
+                          }}
+                        />
+                        <div className="trip-edit-actions">
+                          <button type="submit" className="btn-again" disabled={running || !editText.trim()}>
+                            Send
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-ghost"
+                            onClick={() => setEditing(false)}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
+                      <div className="trip-failed-actions">
+                        <button
+                          type="button"
+                          className="btn-again"
+                          disabled={running}
+                          onClick={() => {
+                            setEditText(m.userText || "");
+                            setEditing(true);
+                          }}
+                        >
+                          Edit &amp; resend
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-ghost"
+                          disabled={running}
+                          onClick={() => onRetry(m.userText)}
+                        >
+                          Retry as-is
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -163,7 +249,11 @@ export default function TripThread({
           <div key={echo.key} className="chat-message user">
             <div className="user-bubble">
               {echo.text}
-              <span className="bubble-time">sending…</span>
+              {/* The server owns this label: a retry that could not reach the
+                  backend must not keep claiming to be in flight. */}
+              <span className={`bubble-time${running ? "" : " failed"}`}>
+                {running ? "sending…" : "not sent — tap to retry"}
+              </span>
             </div>
           </div>
         )}

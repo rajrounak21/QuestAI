@@ -41,6 +41,7 @@ def run_trip_planner(
             "itinerary": [],
             "message": "",
             "error": None,
+            "warnings": [],
             "progress_steps": [],
             # "overwrite": modal-approved replan of an existing session.
             # Anything else (or missing) on an existing trip -> confirm gate.
@@ -66,6 +67,7 @@ def run_trip_planner(
                     "preview_trip": result.get("preview_trip"),
                     "cap_paused": cap_paused,
                     "progress_steps": result.get("progress_steps", []),
+                    "warnings": result.get("warnings", []),
                 }
 
             if error:
@@ -76,6 +78,7 @@ def run_trip_planner(
                     "clarifying_questions": [],
                     "cap_paused": cap_paused,
                     "progress_steps": result.get("progress_steps", []),
+                    "warnings": result.get("warnings", []),
                 }
 
             return {
@@ -85,6 +88,7 @@ def run_trip_planner(
                 "clarifying_questions": [],
                 "cap_paused": cap_paused,
                 "progress_steps": result.get("progress_steps", []),
+                    "warnings": result.get("warnings", []),
             }
 
         except Exception as e:

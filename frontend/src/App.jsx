@@ -1,5 +1,6 @@
 import { useEffect } from "react";
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import ErrorBoundary from "./shared/ErrorBoundary";
 import LandingApp from "./landing/App.jsx";
 import "./landing/index.css";
 import AuthCallback from "../auth/AuthCallback";
@@ -42,13 +43,15 @@ function DocumentTitle() {
   return null;
 }
 
-export default function App() {
-  useEffect(() => {
-    applyTheme(getTheme());
-  }, []);
+function AppRoutes() {
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
   return (
-    <BrowserRouter>
-      <DocumentTitle />
+    <ErrorBoundary
+      key={pathname}
+      fallbackTitle="This page couldn't be displayed."
+      onReset={() => navigate("/home")}
+    >
       <Routes>
         <Route path="/" element={<LandingApp />} />
         <Route path="/login" element={<Login />} />
@@ -70,6 +73,18 @@ export default function App() {
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+    </ErrorBoundary>
+  );
+}
+
+export default function App() {
+  useEffect(() => {
+    applyTheme(getTheme());
+  }, []);
+  return (
+    <BrowserRouter>
+      <DocumentTitle />
+      <AppRoutes />
     </BrowserRouter>
   );
 }

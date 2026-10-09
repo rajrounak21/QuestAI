@@ -15,7 +15,7 @@ class TripStatus(str, Enum):
 
 
 class TripBudget(BaseModel):
-    currency: str = "USD"
+    currency: str = ""
     max_total: float | None = None
     flight_budget: float | None = None
     hotel_budget: float | None = None
