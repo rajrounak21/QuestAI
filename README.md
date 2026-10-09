@@ -35,7 +35,7 @@ actual research, and **every single search in the product runs through
 - [Architecture](#architecture)
 - [API surface](#api-surface)
 - [Project layout](#project-layout)
-- [Tests and verification](#tests-and-verification)
+- [Tests](#tests)
 - [Troubleshooting](#troubleshooting)
 - [License](#license)
 
@@ -480,56 +480,25 @@ frontend/src/
 
 ---
 
-## Tests and verification
-
-### Frontend — no network, no API keys
+## Tests
 
 ```bash
 cd frontend && npm test
 ```
 
-Three suites:
+No network and no API keys needed. Three suites:
 - `test_agents.cjs` — the frontend agent registry and the backend catalog agree:
   ids are unique, every agent is selectable, and every path matches
 - `test_merge_fields.cjs` — router fields merge with per-page parsers, and the
   router wins on conflict
 - `test_currency.cjs` — budget parsing (symbols, `k` suffixes, bare numbers)
 
-### Backend
-
-Each is runnable on its own. Costs are noted per command.
-
-```bash
-# SerpApi retry policy. Stubs the provider, so 0 credits.
-.venv/bin/python -m backend.agents.shared.verify_serpapi_retry
-
-# Research evidence cache: a repeat query spends no search. Costs 1.
-.venv/bin/python -m backend.agents.shared.verify_cache
-
-# Research parsers against live SerpApi shapes. Costs 3.
-.venv/bin/python -m backend.agents.research.tools.verify_parsers
-
-# Trip graph: past-date guard, parallel dispatch, currency, warnings,
-# IATA resolution, and the clarification loop. No live searches.
-.venv/bin/python -m backend.agents.travel.tests.verify_trip_speed
-
-# Trip revision hashing and derived return dates. No live searches.
-.venv/bin/python -m backend.agents.travel.tests.verify_trip_revision
-
-# A failed turn persists and is retryable. No live searches.
-.venv/bin/python -m backend.agents.travel.tests.verify_failed_run
-
-# Follow-up JSON extraction (the models that previously truncated). No live searches.
-.venv/bin/python -m backend.agents.travel.tests.verify_json_followup
-
-# Trip history route and payload. Needs a running backend.
-.venv/bin/python -m backend.agents.travel.tests.verify_history_route
-```
-
-`verify_parsers` exists because those parsers originally shipped unverified,
-which turned out to matter: `google_news` returns no `snippet`, and
-`process_sources()` discards sources with an empty snippet, so the entire news
-branch was being dropped without any error being raised.
+On the backend, `verify_parsers` checks the research parsers against live SerpApi
+response shapes and confirms every engine produces at least one source that
+survives `process_sources()`. Costs 3 searches. It exists because those parsers
+originally shipped unverified, which turned out to matter: `google_news` returns
+no `snippet`, and `process_sources()` discards sources with an empty snippet, so
+the entire news branch was being dropped without any error being raised.
 
 ---
 
