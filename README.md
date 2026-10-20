@@ -488,5 +488,5 @@ frontend/src/
 
 MIT — see [LICENSE](LICENSE).
 
-Built for the SerpApi India Hackathon 2026. Not affiliated with or endorsed by
+Built for the Showcase the use of SerpAPI. Not affiliated with or endorsed by
 SerpApi.
